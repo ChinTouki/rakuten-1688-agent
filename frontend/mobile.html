@@ -334,6 +334,43 @@
   <!-- （シンプルな固定フッターは、今回はナビゲーションボタンで代用） -->
 
   <script>
+    const TOKEN_STORAGE_KEY = "rakuten_agent_token_v1";
+  let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+
+  async function ensureToken() {
+    if (!agentToken) {
+      const input = window.prompt("運営エージェント用パスワードを入力してください：");
+      if (!input) {
+        throw new Error("パスワードが入力されていません。");
+      }
+      agentToken = input.trim();
+      localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
+    }
+  }
+
+  async function secureFetch(url, options = {}) {
+    await ensureToken();
+
+    const headers = options.headers || {};
+    // 如果没显式指定 Content-Type，默认加上
+    if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+    headers["X-Agent-Token"] = agentToken;
+
+    const resp = await fetch(url, { ...options, headers });
+
+    if (resp.status === 401) {
+      // 密码错了，清空并提示重输
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      agentToken = "";
+      alert("パスワードが間違っています。もう一度お試しください。");
+      throw new Error("Unauthorized");
+    }
+
+    return resp;
+  }
+
     // --- PWA: Service Worker 登録（インデックスと同じ） ---
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
@@ -412,11 +449,22 @@
       };
 
       try {
-        const resp = await fetch("/market_auto_select", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        const resp = await secureFetch("/market_auto_select", {
+  method: "POST",
+  body: JSON.stringify(payload),
+});
+
+        const resp = await secureFetch("/rakuten_profit_simulate", {
+  method: "POST",
+  body: JSON.stringify(payload),
+});
+
+const resp = await secureFetch("/rakuten_listing_copy", {
+  method: "POST",
+  body: JSON.stringify(payload),
+});
+
+
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
         window.lastAutoSelectResultsMobile = data.results || [];

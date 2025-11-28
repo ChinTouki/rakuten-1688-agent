@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.responses import PlainTextResponse
@@ -21,6 +21,22 @@ app = FastAPI(title="Rakuten-1688 Selection Agent v1")
 
 # ★ 把 YOUR_API_KEY 换成你自己的 OpenAI API Key（临时写在代码里即可，本机测试用）
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# ★ 新增：从环境变量读取访问密码（token）
+AGENT_ACCESS_TOKEN = os.getenv("AGENT_ACCESS_TOKEN", "")
+
+def verify_token(x_agent_token: str = Header(None)):
+    """
+    简单访问控制：
+    - 如果没有设置环境变量 AGENT_ACCESS_TOKEN，则不启用校验（便于本地开发）
+    - 如果设置了，则要求请求头 X-Agent-Token 完全匹配
+    """
+    if not AGENT_ACCESS_TOKEN:
+        # 没配置就相当于不启用保护
+        return
+
+    if x_agent_token != AGENT_ACCESS_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 
@@ -939,7 +955,7 @@ def market_suggest(req: MarketSuggestRequest):
         "suggestions": suggestions,
     }
 
-@app.post("/market_auto_select")
+@app.post("/market_auto_select", dependencies=[Depends(verify_token)])
 def market_auto_select(req: MarketAutoSelectRequest):
     """
     一键管道：
@@ -1068,7 +1084,7 @@ def market_auto_select_csv(req: MarketAutoSelectRequest):
     csv_text = output.getvalue()
     return csv_text
 
-@app.post("/rakuten_profit_simulate")
+@app.post("/rakuten_profit_simulate", dependencies=[Depends(verify_token)])
 def rakuten_profit_simulate(req: ProfitSimRequest):
     """
     给一组候选商品做乐天利润测算：
@@ -1120,7 +1136,7 @@ def rakuten_profit_simulate(req: ProfitSimRequest):
         "items": result_items,
     }
 
-@app.post("/rakuten_listing_copy")
+@app.post("/rakuten_listing_copy", dependencies=[Depends(verify_token)])
 def rakuten_listing_copy(req: ListingCopyRequest):
     """
     1688の中国語情報から、楽天向け日本語商品ページ文案を生成するエンドポイント。

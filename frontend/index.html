@@ -302,7 +302,59 @@
   <script>
      const TOKEN_STORAGE_KEY = "rakuten_agent_token_v1";
   let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+  
+  async function handleStep1() {
+  const payload = { /* ... */ };
 
+  const resp = await secureFetch("/market_auto_select", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    throw new Error("HTTP " + resp.status);
+  }
+
+  const data = await resp.json();
+  // 后面都用 data，而不是再声明 resp
+}
+
+async function handleStep2() {
+  const payload = { /* ... */ };
+
+  const resp = await secureFetch("/rakuten_profit_simulate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    throw new Error("HTTP " + resp.status);
+  }
+
+  const data = await resp.json();
+  // 用 data 渲染界面
+}
+
+async function handleStep3() {
+  const payload = { /* ... */ };
+
+  const resp = await secureFetch("/rakuten_listing_copy", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    throw new Error("HTTP " + resp.status);
+  }
+
+  const data = await resp.json();
+  // 用 data.title_jp / data.bullets_jp ... 渲染文案
+}
+
+  
+  
+  
+  
   async function ensureToken() {
     if (!agentToken) {
       const input = window.prompt("運営エージェント用パスワードを入力してください：");

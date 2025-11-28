@@ -449,11 +449,11 @@
       };
 
       try {
-const resp = await fetch("/market_auto_select", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+       const resp = await secureFetch("/market_auto_select", {
+       method: "POST",
+       body: JSON.stringify(payload),
+       });
+
 
 
         if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -593,11 +593,11 @@ const resp = await fetch("/market_auto_select", {
       };
 
       try {
-        const resp = await fetch("/rakuten_profit_simulate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+        const resp = await secureFetch("/rakuten_profit_simulate", {
+        method: "POST",
+        body: JSON.stringify(payload),
         });
+
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
         const item = (data.items || [])[0];
@@ -655,11 +655,11 @@ const resp = await fetch("/market_auto_select", {
       };
 
       try {
-        const resp = await fetch("/rakuten_listing_copy", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+        const resp = await secureFetch("/rakuten_listing_copy", {
+        method: "POST",
+        body: JSON.stringify(payload),
         });
+
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
 

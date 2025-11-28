@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from fastapi.responses import PlainTextResponse
 import csv
 from io import StringIO
@@ -78,10 +78,11 @@ class ProfitSimRequest(BaseModel):
     items: List[ProfitSimItem]
 
 class ListingCopyRequest(BaseModel):
-    title_cn: str                # 1688 中文标题
-    desc_cn: str = ""            # 1688 中文详情（可选）
-    keywords_jp: List[str] = []  # 你想优先加入的日文关键词
-    shop_tone: str = "シンプル"   # 店铺语气："シンプル" / "丁寧" / "カジュアル" 等
+    title_cn: str
+    desc_cn: Optional[str] = ""
+    keywords_jp: List[str] = []
+    shop_tone: str = "シンプル"
+
 
 
 
@@ -1122,10 +1123,82 @@ def rakuten_profit_simulate(req: ProfitSimRequest):
 @app.post("/rakuten_listing_copy")
 def rakuten_listing_copy(req: ListingCopyRequest):
     """
-    从 1688 中文信息生成乐天日文商品文案。
+    1688の中国語情報から、楽天向け日本語商品ページ文案を生成するエンドポイント。
+    エラーが起きても HTTP 500 にはせず、raw_text にメッセージを入れて 200 で返す。
     """
-    data = generate_rakuten_listing_copy(req)
-    return data
+    system_prompt = (
+        "あなたは日本の楽天市場のプロの運営担当者です。"
+        "出力は必ず JSON のみで返してください。"
+        "構造は {"
+        '"title_jp": "...",'
+        '"bullets_jp": ["...", "..."],'
+        '"description_jp": "...",'
+        '"search_keywords_jp": ["...", "..."]'
+        "} です。"
+    )
+
+    user_prompt = f"""
+1688の商品情報をもとに、楽天市場向けの日本語の商品ページ文案を作ってください。
+
+[中国語タイトル]
+{req.title_cn}
+
+[中国語説明文]
+{req.desc_cn or "（説明文なし）"}
+
+[優先キーワード（日文）]
+{", ".join(req.keywords_jp) if req.keywords_jp else "（特になし）"}
+
+[文体]
+{req.shop_tone}
+
+注意:
+- タイトルは全角 60〜80 文字程度を目安にしてください。
+- 箇条書きは 4〜6 個にしてください。
+- 説明文は 400〜800 文字を目安に、読みやすい段落にしてください。
+- 絶対に JSON 以外の文章は書かないでください。
+"""
+
+    # 1) 先调用 OpenAI，如果失败，就用 raw_text 返回错误信息（HTTP 200）
+    try:
+        resp = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  # 如果这个模型不通，可以先换成 gpt-3.5-turbo 试试
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.5,
+        )
+        content = resp["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        # 不抛 HTTPException，避免前端看到 500
+        return {
+            "title_jp": "",
+            "bullets_jp": [],
+            "description_jp": "",
+            "search_keywords_jp": [],
+            "raw_text": f"OPENAI_ERROR: {e}",
+        }
+
+    # 2) 解析 JSON，如果失败，就把原始 content 走 raw_text 兜底
+    try:
+        data = json.loads(content)
+        return {
+            "title_jp": data.get("title_jp", ""),
+            "bullets_jp": data.get("bullets_jp", []),
+            "description_jp": data.get("description_jp", ""),
+            "search_keywords_jp": data.get("search_keywords_jp", []),
+        }
+    except Exception:
+        # 这里前端会走 raw_text 分支，在页面显示原文
+        return {
+            "title_jp": "",
+            "bullets_jp": [],
+            "description_jp": "",
+            "search_keywords_jp": [],
+            "raw_text": content,
+        }
+
 
 # 挂载前端界面，访问 /ui 就能打开网页
 app.mount("/ui", StaticFiles(directory="frontend", html=True), name="ui")

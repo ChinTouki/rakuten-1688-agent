@@ -3,3 +3,4 @@ uvicorn[standard]==0.38.0
 openai==0.28.0
 requests>=2.31.0
 python-multipart>=0.0.9
+beautifulsoup4>=4.12.0

@@ -115,6 +115,33 @@
     </section>
 
     <!-- Step 2: 利益シミュレーション -->
+        <!-- 1688 URL インポート（半自動） -->
+    <section class="bg-white rounded-2xl shadow p-4 md:p-6">
+      <h2 class="text-lg font-semibold mb-2">STEP1.5：1688 商品URLインポート（半自動）</h2>
+      <p class="text-sm text-slate-600 mb-3">
+        1688 で目視選定した商品URLを貼り付けて、タイトルと仕入れ単価を自動取得します。
+        取得できない場合は、ブラウザで開いて手動でコピーしてください。
+      </p>
+
+      <form id="aliUrlForm" class="flex flex-col md:flex-row gap-2 mb-3">
+        <input
+          id="aliUrlInput"
+          type="url"
+          placeholder="https://detail.1688.com/offer/....html"
+          class="flex-1 border rounded-lg px-2 py-1 text-sm"
+        />
+        <button
+          type="submit"
+          class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm"
+        >
+          1688 商品情報を取得
+        </button>
+      </form>
+
+      <div id="aliUrlResult" class="text-xs text-slate-500"></div>
+    </section>
+
+
     <section class="bg-white rounded-2xl shadow p-4 md:p-6">
       <h2 class="text-lg font-semibold mb-2">STEP2：楽天利益シミュレーション</h2>
       <p class="text-sm text-slate-600 mb-4">
@@ -702,6 +729,97 @@ async function handleStep3() {
         resultEl.innerHTML = "<div class='text-xs text-red-500'>文案生成に失敗しました：" + err + "</div>";
       }
     });
+
+    const TOKEN_STORAGE_KEY = "rakuten_agent_token_v1";
+  let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+
+  // ... 这里已经有 secureFetch / 各种事件监听，不动它们 ...
+
+  // ===== 1688 URL インポート（PC用） =====
+  let lastParsed1688Item = null;
+
+  const aliUrlForm = document.getElementById("aliUrlForm");
+  if (aliUrlForm) {
+    aliUrlForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const urlInput = document.getElementById("aliUrlInput");
+      const url = (urlInput.value || "").trim();
+      const resultEl = document.getElementById("aliUrlResult");
+
+      if (!url) {
+        resultEl.innerHTML =
+          "<div class='text-xs text-red-500'>1688 の商品URLを入力してください。</div>";
+        return;
+      }
+
+      resultEl.innerHTML =
+        "<div class='text-xs text-slate-500'>解析中...</div>";
+
+      try {
+        const resp = await secureFetch("/ali1688/parse_url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!resp.ok) {
+          const errJson = await resp.json().catch(() => null);
+          const msg = errJson?.detail || ("HTTP " + resp.status);
+          throw new Error(msg);
+        }
+
+        const data = await resp.json();
+        lastParsed1688Item = data;
+
+        resultEl.innerHTML = `
+          <div class="border border-emerald-200 rounded-lg p-3 text-xs space-y-2">
+            <div class="font-semibold text-slate-800 mb-1">解析結果</div>
+            <div><span class="font-medium">タイトル（CN）：</span>${data.title_cn || "(取得できませんでした)"}</div>
+            <div><span class="font-medium">価格（CNY）：</span>${data.price_cny ?? "(不明)"}</div>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <button type="button"
+                class="px-2 py-1 rounded bg-emerald-600 text-white"
+                onclick="applyParsed1688ToProfit()">
+                利益試算に反映
+              </button>
+              <button type="button"
+                class="px-2 py-1 rounded bg-indigo-600 text-white"
+                onclick="applyParsed1688ToListing()">
+                文案生成に反映
+              </button>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        console.error(err);
+        resultEl.innerHTML =
+          "<div class='text-xs text-red-500'>解析に失敗しました：" + err + "</div>";
+      }
+    });
+  }
+
+  window.applyParsed1688ToProfit = function () {
+    if (!lastParsed1688Item) return;
+    const it = lastParsed1688Item;
+    const titleInput = document.getElementById("profitTitleCn");
+    const costInput = document.getElementById("costCny");
+
+    if (titleInput && it.title_cn) {
+      titleInput.value = it.title_cn;
+    }
+    if (costInput && typeof it.price_cny === "number") {
+      costInput.value = it.price_cny;
+    }
+  };
+
+  window.applyParsed1688ToListing = function () {
+    if (!lastParsed1688Item) return;
+    const it = lastParsed1688Item;
+    const titleInput = document.getElementById("listingTitleCn");
+    if (titleInput && it.title_cn) {
+      titleInput.value = it.title_cn;
+    }
+  };
   </script>
 </body>
 </html>

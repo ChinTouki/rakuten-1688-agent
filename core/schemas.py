@@ -1,6 +1,25 @@
 # core/schemas.py
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
+from typing import Optional, List
+from pydantic import BaseModel
+
+# ...（这里是你原有的 schema 定义）...
+
+
+class Ali1688UrlParseRequest(BaseModel):
+    """前端贴一个 1688 商品 URL 过来"""
+    url: str
+
+
+class Ali1688ParsedItem(BaseModel):
+    """从 1688 网页解析出来的结构化商品信息"""
+    url: str
+    title_cn: Optional[str] = None
+    price_cny: Optional[float] = None
+    images: List[str] = []
+    # 方便后面做 debug / 更复杂解析，可选保留一小段 HTML
+    raw_html_snippet: Optional[str] = None
 
 
 @dataclass

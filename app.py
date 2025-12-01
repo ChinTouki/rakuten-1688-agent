@@ -6,6 +6,9 @@ import csv
 from io import StringIO
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -13,6 +16,10 @@ import openai
 import json
 
 from fastapi.staticfiles import StaticFiles
+
+from core.schemas import Ali1688UrlParseRequest, Ali1688ParsedItem
+from tools.ali1688_url_parser import parse_1688_url, Ali1688UrlParseError
+
 
 
 
@@ -916,6 +923,21 @@ def auto_select(req: AutoSelectRequest):
         "max_price_cny": req.max_price_cny,
         "results": scored,
     }
+
+@app.post("/ali1688/parse_url", response_model=Ali1688ParsedItem)
+def ali1688_parse_url(req: Ali1688UrlParseRequest):
+    """
+    贴 1688 商品 URL，自动抓取商品标题 / 价格 / 图片。
+    """
+    try:
+        item_dict = parse_1688_url(req.url)
+    except Ali1688UrlParseError as e:
+        # 抛成 400，前端可以直接提示
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 用 Pydantic 做一次标准化
+    return Ali1688ParsedItem(**item_dict)
 
 @app.post("/market_suggest")
 def market_suggest(req: MarketSuggestRequest):

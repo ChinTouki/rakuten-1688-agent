@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <title>楽天選品・運営エージェント コンソール（MVP）</title>
+  <link rel="icon" type="image/png" href="/ui/icon-192.png">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#020617" />
   <link rel="manifest" href="/ui/manifest.webmanifest" />
@@ -35,13 +37,13 @@
           <label class="block text-sm font-medium text-slate-700 mb-1">
             避けたいジャンルキーワード（日文・カンマ区切り）
           </label>
-          <input
-            id="avoidKeywords"
-            type="text"
-            class="w-full border rounded-lg px-2 py-1 text-sm"
-            placeholder="例）ベビー, 食品"
-            value="ベビー, 食品"
-          />
+         <input
+  　　　　　id="avoidKeywordsInput"
+ 　　　　　 type="text"
+  　　　　　class="..."
+  　　　　　placeholder="避けたいジャンルを入力してください"
+　　　　　/>
+
         </div>
 
         <div class="grid grid-cols-2 gap-2">
@@ -441,12 +443,13 @@ async function handleStep3() {
       statusEl.textContent = "選品中...（/market_auto_select にリクエスト中）";
       resultEl.innerHTML = "";
 
-      const budget = document.getElementById("budgetLevel").value;
-      const avoidRaw = document.getElementById("avoidKeywords").value || "";
-      const avoidKeywords = avoidRaw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+    const avoidInput = document.getElementById("avoidKeywordsInput");
+　　const rawAvoid = (avoidInput.value || "");  // 不再强制默认“ベビー,食品”
+　　const avoidKeywords = rawAvoid
+  　　.split(/[,，、\s]+/)
+ 　　 .map(s => s.trim())
+  　　.filter(Boolean);
+
 
       const topK = parseInt(document.getElementById("topKCategories").value || "3", 10);
       const maxItems = parseInt(document.getElementById("maxItemsPerCategory").value || "20", 10);
@@ -730,7 +733,7 @@ async function handleStep3() {
       }
     });
 
-    
+
 
   // ... 这里已经有 secureFetch / 各种事件监听，不动它们 ...
 

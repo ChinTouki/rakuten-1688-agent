@@ -12,6 +12,42 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
+<!-- ===== アクセスパスワード入力区（Agent 用ログイン） ===== -->
+<section class="mb-4 border border-indigo-500/40 rounded-xl p-3 bg-slate-900/40">
+  <form id="agentTokenForm" class="space-y-1">
+    <label for="agentTokenInput" class="block text-xs font-semibold text-slate-100">
+      アクセスパスワード
+    </label>
+    <input
+      id="agentTokenInput"
+      type="password"
+      class="w-full rounded-md border border-slate-500 bg-slate-950/80 px-2 py-1 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+      placeholder="Render の環境変数 AGENT_ACCESS_TOKEN と同じ値"
+    />
+    <button
+      type="submit"
+      class="mt-1 inline-flex items-center rounded bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-slate-50 hover:bg-indigo-400"
+    >
+      パスワードを保存
+    </button>
+    <p id="tokenStatus" class="mt-1 text-[11px] text-slate-400"></p>
+  </form>
+
+  <form id="marketForm" class="space-y-2">
+  <!-- 预算、避开关键词、价格区间等等 -->
+  <button
+    type="submit"
+    class="px-4 py-1 rounded bg-indigo-500 text-sm text-white font-semibold"
+  >
+    自動選品
+  </button>
+</form>
+
+<p id="marketStatus" class="mt-1 text-xs text-slate-600"></p>
+<div id="marketResult" class="mt-2"></div>
+
+</section>
+
 
   <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
     <!-- Step 1: 自動選品 -->
@@ -337,43 +373,50 @@
   </main>
 
   <script>
-    // ====== 共通：Token 管理 + secureFetch ======
+   // ===== 共通：Token 管理 + secureFetch =====
 const TOKEN_STORAGE_KEY = "rakuten_agent_token";
-
-// 1) 先从 localStorage 里读一次（刷新页面也能记住）
 let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
 
-// 如果你有一个密码输入框：<input id="agentTokenInput" ...>
-// 和一个form：<form id="agentTokenForm">...</form>
-const tokenForm = document.getElementById("agentTokenForm");
-const tokenInput = document.getElementById("agentTokenInput");
-const tokenStatus = document.getElementById("tokenStatus"); // 可选的小提示
+// 如果你有密码输入表单：<form id="agentTokenForm"> 和 <input id="agentTokenInput">
+document.addEventListener("DOMContentLoaded", () => {
+  const tokenForm = document.getElementById("agentTokenForm");
+  const tokenInput = document.getElementById("agentTokenInput");
+  const tokenStatus = document.getElementById("tokenStatus");
 
-if (tokenForm && tokenInput) {
-  tokenForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    agentToken = (tokenInput.value || "").trim();
-    localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
+  // 页面加载时，如果 localStorage 已有 token，就回填
+  if (tokenInput && agentToken) {
+    tokenInput.value = agentToken;
+  }
 
-    if (tokenStatus) {
-      tokenStatus.textContent = "パスワードを保存しました";
-      tokenStatus.className = "text-[11px] text-emerald-400 mt-1";
-    }
-  });
-}
+  if (tokenForm && tokenInput) {
+    tokenForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      agentToken = (tokenInput.value || "").trim();
+      localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
 
-// 2) 后续所有请求统一走 secureFetch，自动加上 X-Agent-Token
+      if (tokenStatus) {
+        if (agentToken) {
+          tokenStatus.textContent = "パスワードを保存しました。";
+          tokenStatus.className = "mt-1 text-[11px] text-emerald-400";
+        } else {
+          tokenStatus.textContent = "パスワードを入力してください。";
+          tokenStatus.className = "mt-1 text-[11px] text-amber-400";
+        }
+      }
+    });
+  }
+});
+
+// 后续所有 API 请求都通过 secureFetch，自动带上 X-Agent-Token
 async function secureFetch(path, options = {}) {
   const baseUrl = window.location.origin;
-
   const headers = Object.assign({}, options.headers || {});
 
-  // 默认 JSON
   if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
 
-  // ★ 关键：把 token 放到请求头里
+  // ★ 关键：把 token 写到请求头
   if (agentToken) {
     headers["X-Agent-Token"] = agentToken;
   }
@@ -457,121 +500,121 @@ async function handleStep3() {
     window.lastAutoSelectResults = [];
 
     // ===== STEP1：自動選品（PC） =====
-  const marketFormPC = document.getElementById("marketForm");
-  if (marketFormPC) {
-    marketFormPC.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  // ===== STEP1：自動選品（PC） =====
+const marketFormPC = document.getElementById("marketForm");
+if (marketFormPC) {
+  marketFormPC.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const statusEl = document.getElementById("marketStatus");
-      const resultEl = document.getElementById("marketResult");
+    const statusEl = document.getElementById("marketStatus");
+    const resultEl = document.getElementById("marketResult");
 
-      if (!statusEl || !resultEl) {
-        console.warn("marketStatus or marketResult not found");
+    if (!statusEl || !resultEl) {
+      console.warn("marketStatus or marketResult not found");
+      return;
+    }
+
+    statusEl.textContent = "選品中...（/market_auto_select にリクエスト中）";
+    resultEl.innerHTML = "";
+
+    try {
+      const budgetSelect   = document.getElementById("budgetLevelSelect");
+      const avoidInput     = document.getElementById("avoidKeywordsInput");
+      const topKInput      = document.getElementById("topKInput");
+      const maxItemsInput  = document.getElementById("maxItemsInput");
+      const minPriceInput  = document.getElementById("minPriceInput");
+      const maxPriceInput  = document.getElementById("maxPriceInput");
+
+      const budget_level = (budgetSelect?.value || "low");
+
+      const rawAvoid = (avoidInput?.value || "");
+      const avoid_keywords = rawAvoid
+        .split(/[,，、\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const top_k_categories = parseInt(topKInput?.value || "3", 10);
+      const max_items_per_category = parseInt(maxItemsInput?.value || "20", 10);
+      const min_price_cny = parseFloat(minPriceInput?.value || "5");
+      const max_price_cny = parseFloat(maxPriceInput?.value || "40");
+
+      const payload = {
+        budget_level,
+        avoid_keywords,
+        top_k_categories,
+        max_items_per_category,
+        min_price_cny,
+        max_price_cny,
+      };
+
+      const resp = await secureFetch("/market_auto_select", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        let msg = "HTTP " + resp.status;
+        try {
+          const errJson = await resp.json();
+          if (errJson?.detail) msg = errJson.detail;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const data = await resp.json();
+
+      statusEl.textContent = "選品完了";
+
+      const suggestions = data.suggestions || data.results || [];
+      if (!suggestions.length) {
+        resultEl.textContent =
+          "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
         return;
       }
 
-      // 先显示「選品中...」
-      statusEl.textContent = "選品中...（/market_auto_select にリクエスト中）";
-      resultEl.innerHTML = "";
+      // ★ 这里存一下，后面的 useForProfit / useForListing 会用到
+      window.lastAutoSelectResults = suggestions;
 
-      try {
-        const budgetSelect   = document.getElementById("budgetLevelSelect");
-        const avoidInput     = document.getElementById("avoidKeywordsInput");
-        const topKInput      = document.getElementById("topKInput");
-        const maxItemsInput  = document.getElementById("maxItemsInput");
-        const minPriceInput  = document.getElementById("minPriceInput");
-        const maxPriceInput  = document.getElementById("maxPriceInput");
+      // 暂时直接展示 JSON
+      resultEl.innerHTML = `
+        <div class="text-xs text-slate-800 whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded-md p-2">
+${JSON.stringify(suggestions, null, 2)}
+        </div>
+      `;
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "自動選品に失敗しました：" + err;
+      resultEl.innerHTML =
+        '<p class="text-xs text-red-500">1688 側との通信に問題が発生しました。しばらくしてから再度お試しください。</p>';
+    }
+  });
+}
 
-        // ★ 这里统一用 budget_level，不要用 budget 这个名字
-        const budget_level = (budgetSelect?.value || "low");
+// STEP1 → STEP2/3 連携用
+window.useForProfit = function (catIndex, itemIndex) {
+  const cat = (window.lastAutoSelectResults || [])[catIndex];
+  if (!cat) return;
+  const item = (cat.items || [])[itemIndex];
+  if (!item) return;
 
-        const rawAvoid = (avoidInput?.value || "");
-        const avoid_keywords = rawAvoid
-          .split(/[,，、\s]+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
+  document.getElementById("profitProductId").value =
+    (cat.jp_category || "cat") + "_" + (item.id || ("i" + itemIndex));
+  document.getElementById("profitTitleCn").value = item.title_cn || "";
+  document.getElementById("costCny").value = item.price_cny ?? "";
+};
 
-        const top_k_categories = parseInt(topKInput?.value || "3", 10);
-        const max_items_per_category = parseInt(maxItemsInput?.value || "20", 10);
-        const min_price_cny = parseFloat(minPriceInput?.value || "5");
-        const max_price_cny = parseFloat(maxPriceInput?.value || "40");
+window.useForListing = function (catIndex, itemIndex) {
+  const cat = (window.lastAutoSelectResults || [])[catIndex];
+  if (!cat) return;
+  const item = (cat.items || [])[itemIndex];
+  if (!item) return;
 
-        const payload = {
-          budget_level,
-          avoid_keywords,
-          top_k_categories,
-          max_items_per_category,
-          min_price_cny,
-          max_price_cny,
-        };
+  document.getElementById("listingTitleCn").value = item.title_cn || "";
+  document.getElementById("listingDescCn").value = "";
+  document.getElementById("listingKeywordsJp").value =
+    (cat.jp_category || "").replace("Amazon｜", "").replace(/[（）\(\)]/g, " ");
+};
 
-        const resp = await secureFetch("/market_auto_select", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!resp.ok) {
-          let msg = "HTTP " + resp.status;
-          try {
-            const errJson = await resp.json();
-            if (errJson?.detail) msg = errJson.detail;
-          } catch (_) {}
-          throw new Error(msg);
-        }
-
-        const data = await resp.json();
-
-        statusEl.textContent = "選品完了";
-
-        const suggestions = data.suggestions || data.results || [];
-        if (!suggestions.length) {
-          resultEl.textContent =
-            "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
-          return;
-        }
-
-        // 先用 JSON 原样展示，确认数据回来了；之后你再换成卡片 UI 也可以
-        resultEl.innerHTML = `
-          <div class="text-xs text-slate-800 whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded-md p-2">
-            ${JSON.stringify(suggestions, null, 2)}
-          </div>
-        `;
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "自動選品に失敗しました：" + err;
-        resultEl.innerHTML =
-          '<p class="text-xs text-red-500">1688 側との通信に問題が発生しました。しばらくしてから再度お試しください。</p>';
-      }
-    });
-  }
-
-    // STEP1 → STEP2/3 連携用：利益試算に持っていく
-    window.useForProfit = function (catIndex, itemIndex) {
-      const cat = window.lastAutoSelectResults[catIndex];
-      if (!cat) return;
-      const item = (cat.items || [])[itemIndex];
-      if (!item) return;
-
-      document.getElementById("profitProductId").value =
-        (cat.jp_category || "cat") + "_" + (item.id || ("i" + itemIndex));
-      document.getElementById("profitTitleCn").value = item.title_cn || "";
-      document.getElementById("costCny").value = item.price_cny ?? "";
-    };
-
-    window.useForListing = function (catIndex, itemIndex) {
-      const cat = window.lastAutoSelectResults[catIndex];
-      if (!cat) return;
-      const item = (cat.items || [])[itemIndex];
-      if (!item) return;
-
-      document.getElementById("listingTitleCn").value = item.title_cn || "";
-      // desc は一旦空、必要なら手動で 1688 からコピペ
-      document.getElementById("listingDescCn").value = "";
-      // カテゴリ名から軽くキーワードを入れておく
-      document.getElementById("listingKeywordsJp").value =
-        (cat.jp_category || "").replace("Amazon｜", "").replace(/[（）\(\)]/g, " ");
-    };
 
     // STEP2: 利益シミュレーション
     document.getElementById("profitForm").addEventListener("submit", async (e) => {

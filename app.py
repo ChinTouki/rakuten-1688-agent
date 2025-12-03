@@ -1,42 +1,82 @@
-from fastapi import FastAPI, HTTPException, Header, Depends
-from pydantic import BaseModel
-from typing import List, Optional
-from fastapi.responses import PlainTextResponse
-import csv
-from io import StringIO
 import os
+import csv
+import json
+import logging
+from io import StringIO
+from typing import List, Optional
 
 from dotenv import load_dotenv
-load_dotenv()
+
+from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
+
+
+from pydantic import BaseModel
 
 import requests
 from bs4 import BeautifulSoup
-
 import openai
-import json
 
-from fastapi.staticfiles import StaticFiles
-
+# 你项目里用到的内部模块（按你实际有的为准）
 from core.schemas import Ali1688UrlParseRequest, Ali1688ParsedItem
+
 from tools.ali1688_url_parser import parse_1688_url, Ali1688UrlParseError
+from tools.ali1688_stub import search_ali1688_by_cn_keyword
+from tools.rakuten_stub import get_jp_trending_categories
 
+# 读取 .env
+load_dotenv()
 
-
-
+# ========= FastAPI 实例 & 静态文件 =========
 
 app = FastAPI(title="Rakuten-1688 Selection Agent v1")
 
-# ★ 把 YOUR_API_KEY 换成你自己的 OpenAI API Key（临时写在代码里即可，本机测试用）
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# CORS（方便你在本机 / Render 上用浏览器访问）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],       # 如果以后要限制域名，可以改成具体列表
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ★ 新增：从环境变量读取访问密码（token）
-AGENT_ACCESS_TOKEN = os.getenv("AGENT_ACCESS_TOKEN", "")
+# 前端静态文件挂载（/ui/ → frontend 目录）
+app.mount("/ui", StaticFiles(directory="frontend", html=True), name="ui")
 
-def verify_token(x_agent_token: str = Header(None)):
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """
+    浏览器请求 /favicon.ico 时返回图标。
+    没有的话就返回 404，不影响其他功能。
+    """
+    icon_path = os.path.join("frontend", "icon-192.png")
+    if os.path.exists(icon_path):
+        return FileResponse(icon_path)
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
+# ========= OpenAI & 访问密码 =========
+
+# 从环境变量读取 OpenAI Key（你已经在 .env 里配了 OPENAI_API_KEY）
+openai.api_key = os.getenv("OPENAI_API_KEY", "")
+
+# 从环境变量读取访问密码（token），前端用 X-Agent-Token 传
+AGENT_ACCESS_TOKEN = os.getenv("AGENT_ACCESS_TOKEN", "").strip()
+
+
+def verify_token(
+    x_agent_token: Optional[str] = Header(
+        default=None,
+        alias="X-Agent-Token",  # 确保用的是这个请求头名
+    )
+):
     """
     简单访问控制：
-    - 如果没有设置环境变量 AGENT_ACCESS_TOKEN，则不启用校验（便于本地开发）
-    - 如果设置了，则要求请求头 X-Agent-Token 完全匹配
+      - 如果环境变量 AGENT_ACCESS_TOKEN 没配置：不校验（方便本地开发）
+      - 如果配置了：要求请求头 X-Agent-Token 完全一致
     """
     if not AGENT_ACCESS_TOKEN:
         # 没配置就相当于不启用保护
@@ -44,6 +84,85 @@ def verify_token(x_agent_token: str = Header(None)):
 
     if x_agent_token != AGENT_ACCESS_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+# ========= 选品相关的请求模型（本文件内定义） =========
+
+class MarketSuggestRequest(BaseModel):
+    """
+    日本市场类目推荐用的请求体：
+    - budget_level: 预算强度（影响客单价带）
+    - avoid_keywords: 想要避开的类目关键字（例如 ["ベビー", "食品"]）
+    - top_k: 推荐几个大类目
+    - market_sources: 使用哪些市场数据源（"rakuten", "amazon" 等）
+    """
+    budget_level: str = "low"           # "low" / "mid" / "high"
+    avoid_keywords: List[str] = []
+    top_k: int = 5
+    market_sources: Optional[List[str]] = None
+
+
+class MarketAutoSelectRequest(BaseModel):
+    """
+    /market_auto_select & /market_auto_select_csv 用的请求体：
+    - budget_level: 预算强度
+    - avoid_keywords: 想避开的类目（前端输入框会传过来）
+    - top_k_categories: 推荐几个类目
+    - max_items_per_category: 每个类目最多抓几个 1688 商品
+    - min_price_cny / max_price_cny: 1688 采购价区间
+    """
+    budget_level: str = "low"
+    avoid_keywords: List[str] = []
+    top_k_categories: int = 5
+    max_items_per_category: int = 30
+    min_price_cny: float = 5.0
+    max_price_cny: float = 40.0
+
+
+class SelectionRequest(BaseModel):
+    """
+    传给 score_product 用的简单配置：
+    - directions: 方向关键词列表（例如类目或搜索词）
+    - min_price_cny / max_price_cny: 价格区间
+    """
+    directions: List[str]
+    min_price_cny: float
+    max_price_cny: float
+
+# ========= 简单打分逻辑（本文件内的临时版本） =========
+
+def score_product(p: dict, sel_req: SelectionRequest) -> float:
+    """
+    给 1688 商品打一个 0~1 的简单分数，用于排序。
+    当前版本非常简单：
+      - 价格在区间内：基础分 0.6
+      - 标题里包含 direction 关键词：每命中一个 +0.2（最多 +0.4）
+    以后你可以随时改成更复杂的规则。
+    """
+    # 价格基础分
+    price = float(p.get("price_cny", 0.0))
+    base = 0.0
+    if sel_req.min_price_cny <= price <= sel_req.max_price_cny:
+        base = 0.6
+
+    # 标题匹配分
+    title = (p.get("title_cn") or p.get("title") or "").lower()
+    match_score = 0.0
+    for kw in sel_req.directions:
+        if not kw:
+            continue
+        if str(kw).lower() in title:
+            match_score += 0.2
+    # 上限 0.4
+    if match_score > 0.4:
+        match_score = 0.4
+
+    score = base + match_score
+    # 限制在 [0, 1]
+    if score < 0.0:
+        score = 0.0
+    if score > 1.0:
+        score = 1.0
+    return score
 
 
 

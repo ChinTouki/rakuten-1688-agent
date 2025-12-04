@@ -387,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (tokenForm && tokenInput) {
-    tokenForm.addEventListener("submit", (e) => {
+    tokenForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const value = (tokenInput.value || "").trim();
 
@@ -398,14 +398,41 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // メモリ上にだけ保存（localStorage は使わない）
+      // いったん入力された値をトークンとしてセット
       agentToken = value;
+      if (tokenError) {
+        tokenError.textContent = "確認中...";
+      }
 
-      if (tokenError) tokenError.textContent = "";
-      if (tokenModal) tokenModal.classList.add("hidden");
+      try {
+        // /auth/check に叩いて、トークンが正しいかどうかを確認
+        const resp = await secureFetch("/auth/check", { method: "GET" });
+
+        if (resp.ok) {
+          // ✅ パスワード正しい → モーダルを閉じる
+          if (tokenError) tokenError.textContent = "";
+          if (tokenModal) tokenModal.classList.add("hidden");
+        } else {
+          // ❌ パスワード不正 → モーダルは閉じない・入力クリア
+          agentToken = "";
+          if (tokenInput) tokenInput.value = "";
+          if (tokenError) {
+            tokenError.textContent = "パスワードが正しくありません。";
+          }
+        }
+      } catch (err) {
+        // サーバーに接続できない場合など
+        agentToken = "";
+        if (tokenInput) tokenInput.value = "";
+        if (tokenError) {
+          tokenError.textContent =
+            "サーバーへの接続に失敗しました。時間をおいて再度お試しください。";
+        }
+      }
     });
   }
 });
+
 
 // 后续所有 API 请求都通过 secureFetch，自动带上 X-Agent-Token
 async function secureFetch(path, options = {}) {

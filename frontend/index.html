@@ -12,8 +12,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<!-- ===== アクセスパスワード入力区（Agent 用ログイン） ===== -->
-<section class="mb-4 border border-indigo-500/40 rounded-xl p-3 bg-slate-900/40">
+<body class="bg-slate-900">
+  <!-- ===== アクセスパスワード入力区（Agent 用ログイン） ===== -->
+  <section class="mb-4 border border-indigo-500/40 rounded-xl p-3 bg-slate-900/40">
+    ...
+
   <form id="agentTokenForm" class="space-y-1">
     <label for="agentTokenInput" class="block text-xs font-semibold text-slate-100">
       アクセスパスワード
@@ -32,135 +35,120 @@
     </button>
     <p id="tokenStatus" class="mt-1 text-[11px] text-slate-400"></p>
   </form>
-
-  <form id="marketForm" class="space-y-2">
-  <!-- 预算、避开关键词、价格区间等等 -->
-  <button
-    type="submit"
-    class="px-4 py-1 rounded bg-indigo-500 text-sm text-white font-semibold"
-  >
-    自動選品
-  </button>
-</form>
-
-<p id="marketStatus" class="mt-1 text-xs text-slate-600"></p>
-<div id="marketResult" class="mt-2"></div>
-
-
-
 </section>
 
-
-  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-    <!-- Step 1: 自動選品 -->
-    <section class="bg-white rounded-2xl shadow p-4 md:p-6">
-      <h2 class="text-lg font-semibold mb-2">STEP1：自動選品（市場トレンド＋1688）</h2>
-      <p class="text-sm text-slate-600 mb-4">
-        楽天＋Amazonトレンドから有望カテゴリを選び、1688 から候補商品を自動収集します。
-      </p>
-
-      <form id="autoSelectForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <label for="budgetLevelSelect"
-       class="block text-sm font-medium text-slate-700 mb-1">
-         資金レベル（客単価帯）
-       </label>
-
-        <select id="budgetLevelSelect"
-        class="w-full border rounded-lg px-2 py-1 text-sm">
-       <option value="low">低め（～2,000円）</option>
-       <option value="mid">中程度（2,000～5,000円）</option>
-       <option value="high">高め（5,000円～）</option>
-       </select>
-
-        </div>
-      <div>
-      <label class="block text-xs font-medium text-slate-900 mb-1">
-       避けたいジャンルキーワード（日文・カンマ区切り）
-      </label>
-     <input
-      id="avoidKeywordsInput"
-      type="text"
-      class="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      placeholder="避けたいジャンル"
-    />
-    <p class="mt-1 text-[10px] text-slate-400">
-      例：ベビー、食品
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+  <!-- Step 1: 自動選品 -->
+  <section class="bg-white rounded-2xl shadow p-4 md:p-6">
+    <h2 class="text-lg font-semibold mb-2">STEP1：自動選品（市場トレンド＋1688）</h2>
+    <p class="text-sm text-slate-600 mb-4">
+      楽天＋Amazonトレンドから有望カテゴリを選び、1688 から候補商品を自動収集します。
     </p>
-  </div>
 
+    <form id="autoSelectForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div>
+        <label
+          for="budgetLevelSelect"
+          class="block text-sm font-medium text-slate-700 mb-1"
+        >
+          資金レベル（客単価帯）
+        </label>
+        <select
+          id="budgetLevelSelect"
+          class="w-full border rounded-lg px-2 py-1 text-sm"
+        >
+          <option value="low">低め（～2,000円）</option>
+          <option value="mid">中程度（2,000～5,000円）</option>
+          <option value="high">高め（5,000円～）</option>
+        </select>
+      </div>
 
+      <div>
+        <label class="block text-xs font-medium text-slate-900 mb-1">
+          避けたいジャンルキーワード（日文・カンマ区切り）
+        </label>
+        <input
+          id="avoidKeywordsInput"
+          type="text"
+          class="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          placeholder="避けたいジャンル"
+        />
+        <p class="mt-1 text-[10px] text-slate-400">
+          例：ベビー、食品
+        </p>
+      </div>
 
-
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">
-              カテゴリ数（top_k）
-            </label>
-            <input
-              id="topKCategories"
-              type="number"
-              min="1"
-              max="10"
-              value="3"
-              class="w-full border rounded-lg px-2 py-1 text-sm"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">
-              カテゴリごとの最大件数
-            </label>
-            <input
-              id="maxItemsPerCategory"
-              type="number"
-              min="5"
-              max="100"
-              value="20"
-              class="w-full border rounded-lg px-2 py-1 text-sm"
-            />
-          </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            カテゴリ数（top_k）
+          </label>
+          <input
+            id="topKCategories"
+            type="number"
+            min="1"
+            max="10"
+            value="3"
+            class="w-full border rounded-lg px-2 py-1 text-sm"
+          />
         </div>
-
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">
-              1688 仕入れ下限（CNY）
-            </label>
-            <input
-              id="minPriceCny"
-              type="number"
-              min="0"
-              value="5"
-              class="w-full border rounded-lg px-2 py-1 text-sm"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">
-              1688 仕入れ上限（CNY）
-            </label>
-            <input
-              id="maxPriceCny"
-              type="number"
-              min="0"
-              value="40"
-              class="w-full border rounded-lg px-2 py-1 text-sm"
-            />
-          </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            カテゴリごとの最大件数
+          </label>
+          <input
+            id="maxItemsPerCategory"
+            type="number"
+            min="5"
+            max="100"
+            value="20"
+            class="w-full border rounded-lg px-2 py-1 text-sm"
+          />
         </div>
+      </div>
 
-        <div class="flex items-end">
-          <button
-            type="submit"
-            class="w-full md:w-auto px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
-          >
-            自動選品を実行する
-          </button>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            1688 仕入れ下限（CNY）
+          </label>
+          <input
+            id="minPriceCny"
+            type="number"
+            min="0"
+            value="5"
+            class="w-full border rounded-lg px-2 py-1 text-sm"
+          />
         </div>
-      </form>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            1688 仕入れ上限（CNY）
+          </label>
+          <input
+            id="maxPriceCny"
+            type="number"
+            min="0"
+            value="40"
+            class="w-full border rounded-lg px-2 py-1 text-sm"
+          />
+        </div>
+      </div>
 
-      <div id="autoSelectStatus" class="text-xs text-slate-500 mb-2"></div>
-      <div id="autoSelectResults" class="space-y-4 text-sm"></div>
-    </section>
+      <div class="flex items-end">
+        <button
+          type="submit"
+          class="w-full md:w-auto px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
+        >
+          自動選品を実行する
+        </button>
+      </div>
+    </form>
+
+    <!-- ★ 結果表示エリアは STEP1 セクション内に置く ★ -->
+    <div id="autoSelectStatus" class="text-xs text-slate-500 mb-2"></div>
+    <div id="autoSelectResults" class="space-y-4 text-sm"></div>
+  </section>
+</main>
 
     <!-- Step 2: 利益シミュレーション -->
         <!-- 1688 URL インポート（半自動） -->
@@ -501,17 +489,18 @@ async function handleStep3() {
     window.lastAutoSelectResults = [];
 
 
-// ===== STEP1：自動選品（PC） =====
-const marketFormPC = document.getElementById("marketForm");
-if (marketFormPC) {
-  marketFormPC.addEventListener("submit", async (e) => {
+// ===== STEP1：自動選品 =====
+const autoSelectFormEl = document.getElementById("autoSelectForm");
+
+if (autoSelectFormEl) {
+  autoSelectFormEl.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const statusEl = document.getElementById("marketStatus");
-    const resultEl = document.getElementById("marketResult");
+    const statusEl = document.getElementById("autoSelectStatus");
+    const resultEl = document.getElementById("autoSelectResults");
 
     if (!statusEl || !resultEl) {
-      console.warn("marketStatus or marketResult not found");
+      console.warn("autoSelectStatus or autoSelectResults not found");
       return;
     }
 
@@ -521,10 +510,10 @@ if (marketFormPC) {
     try {
       const budgetSelect   = document.getElementById("budgetLevelSelect");
       const avoidInput     = document.getElementById("avoidKeywordsInput");
-      const topKInput      = document.getElementById("topKInput");
-      const maxItemsInput  = document.getElementById("maxItemsInput");
-      const minPriceInput  = document.getElementById("minPriceInput");
-      const maxPriceInput  = document.getElementById("maxPriceInput");
+      const topKInput      = document.getElementById("topKCategories");
+      const maxItemsInput  = document.getElementById("maxItemsPerCategory");
+      const minPriceInput  = document.getElementById("minPriceCny");
+      const maxPriceInput  = document.getElementById("maxPriceCny");
 
       const budget_level = (budgetSelect?.value || "low");
 
@@ -702,6 +691,7 @@ if (marketFormPC) {
     }
   });
 }
+
 
 // ===== CSV 出力（STEP1 の結果を CSV エクスポート） =====
 window.downloadMarketCsv = async function () {
@@ -1038,5 +1028,9 @@ window.useForListing = function (catIndex, itemIndex) {
     }
   };
   </script>
+
+    ...
+  <!-- 这里是 STEP1 自動選品 的 section 结束 -->
+
 </body>
 </html>

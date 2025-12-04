@@ -13,150 +13,158 @@
 </head>
 
 <body class="bg-slate-900">
-  <!-- ===== アクセスパスワード入力区（Agent 用ログイン） ===== -->
-  <section class="mb-4 border border-indigo-500/40 rounded-xl p-3 bg-slate-900/40">
-    ...
 
-  <form id="agentTokenForm" class="space-y-1">
-    <label for="agentTokenInput" class="block text-xs font-semibold text-slate-100">
-      アクセスパスワード
-    </label>
-    <input
-      id="agentTokenInput"
-      type="password"
-      class="w-full rounded-md border border-slate-500 bg-slate-950/80 px-2 py-1 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      placeholder="Render の環境変数 AGENT_ACCESS_TOKEN と同じ値"
-    />
-    <button
-      type="submit"
-      class="mt-1 inline-flex items-center rounded bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-slate-50 hover:bg-indigo-400"
-    >
-      パスワードを保存
-    </button>
-    <p id="tokenStatus" class="mt-1 text-[11px] text-slate-400"></p>
-  </form>
-</section>
+  <!-- ===== アクセスパスワード入力 Modal ===== -->
+  <div
+    id="tokenModal"
+    class="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-50"
+  >
+    <div class="bg-slate-950 border border-indigo-500/50 rounded-2xl p-4 w-full max-w-sm shadow-xl">
+      <h2 class="text-sm font-semibold text-slate-50 mb-2">アクセスパスワード</h2>
+      <p class="text-[11px] text-slate-400 mb-3">
+        Render の環境変数 <span class="font-mono">AGENT_ACCESS_TOKEN</span> と同じ値を入力してください。
+      </p>
 
-<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-  <!-- Step 1: 自動選品 -->
-  <section class="bg-white rounded-2xl shadow p-4 md:p-6">
-    <h2 class="text-lg font-semibold mb-2">STEP1：自動選品（市場トレンド＋1688）</h2>
-    <p class="text-sm text-slate-600 mb-4">
-      楽天＋Amazonトレンドから有望カテゴリを選び、1688 から候補商品を自動収集します。
-    </p>
-
-    <form id="autoSelectForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div>
-        <label
-          for="budgetLevelSelect"
-          class="block text-sm font-medium text-slate-700 mb-1"
-        >
-          資金レベル（客単価帯）
-        </label>
-        <select
-          id="budgetLevelSelect"
-          class="w-full border rounded-lg px-2 py-1 text-sm"
-        >
-          <option value="low">低め（～2,000円）</option>
-          <option value="mid">中程度（2,000～5,000円）</option>
-          <option value="high">高め（5,000円～）</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-xs font-medium text-slate-900 mb-1">
-          避けたいジャンルキーワード（日文・カンマ区切り）
-        </label>
+      <form id="agentTokenForm" class="space-y-2">
         <input
-          id="avoidKeywordsInput"
-          type="text"
-          class="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          placeholder="避けたいジャンル"
+          id="agentTokenInput"
+          type="password"
+          class="w-full rounded-md border border-slate-500 bg-slate-900 px-2 py-1 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          placeholder="アクセスパスワード"
         />
-        <p class="mt-1 text-[10px] text-slate-400">
-          例：ベビー、食品
-        </p>
-      </div>
+        <p id="tokenError" class="h-[14px] text-[11px] text-rose-400"></p>
+        <div class="flex justify-end pt-1">
+          <button
+            type="submit"
+            class="inline-flex items-center rounded bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-slate-50 hover:bg-indigo-400"
+          >
+            OK
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      <div class="grid grid-cols-2 gap-2">
+  <!-- ===== メインコンテンツ：全 STEP を同じ幅コンテナ内に配置 ===== -->
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Step 1: 自動選品 -->
+    <section class="bg-white rounded-2xl shadow p-4 md:p-6">
+      <h2 class="text-lg font-semibold mb-2">STEP1：自動選品（市場トレンド＋1688）</h2>
+      <p class="text-sm text-slate-600 mb-4">
+        楽天＋Amazonトレンドから有望カテゴリを選び、1688 から候補商品を自動収集します。
+      </p>
+
+      <form id="autoSelectForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">
-            カテゴリ数（top_k）
+          <label
+            for="budgetLevelSelect"
+            class="block text-sm font-medium text-slate-700 mb-1"
+          >
+            資金レベル（客単価帯）
+          </label>
+          <select
+            id="budgetLevelSelect"
+            class="w-full border rounded-lg px-2 py-1 text-sm"
+          >
+            <option value="low">低め（～2,000円）</option>
+            <option value="mid">中程度（2,000～5,000円）</option>
+            <option value="high">高め（5,000円～）</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-900 mb-1">
+            避けたいジャンルキーワード（日文・カンマ区切り）
           </label>
           <input
-            id="topKCategories"
-            type="number"
-            min="1"
-            max="10"
-            value="3"
-            class="w-full border rounded-lg px-2 py-1 text-sm"
+            id="avoidKeywordsInput"
+            type="text"
+            class="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="避けたいジャンル"
           />
+          <p class="mt-1 text-[10px] text-slate-400">
+            例：ベビー、食品
+          </p>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">
-            カテゴリごとの最大件数
-          </label>
-          <input
-            id="maxItemsPerCategory"
-            type="number"
-            min="5"
-            max="100"
-            value="20"
-            class="w-full border rounded-lg px-2 py-1 text-sm"
-          />
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              カテゴリ数（top_k）
+            </label>
+            <input
+              id="topKCategories"
+              type="number"
+              min="1"
+              max="10"
+              value="3"
+              class="w-full border rounded-lg px-2 py-1 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              カテゴリごとの最大件数
+            </label>
+            <input
+              id="maxItemsPerCategory"
+              type="number"
+              min="5"
+              max="100"
+              value="20"
+              class="w-full border rounded-lg px-2 py-1 text-sm"
+            />
+          </div>
         </div>
-      </div>
 
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">
-            1688 仕入れ下限（CNY）
-          </label>
-          <input
-            id="minPriceCny"
-            type="number"
-            min="0"
-            value="5"
-            class="w-full border rounded-lg px-2 py-1 text-sm"
-          />
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              1688 仕入れ下限（CNY）
+            </label>
+            <input
+              id="minPriceCny"
+              type="number"
+              min="0"
+              value="5"
+              class="w-full border rounded-lg px-2 py-1 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              1688 仕入れ上限（CNY）
+            </label>
+            <input
+              id="maxPriceCny"
+              type="number"
+              min="0"
+              value="40"
+              class="w-full border rounded-lg px-2 py-1 text-sm"
+            />
+          </div>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">
-            1688 仕入れ上限（CNY）
-          </label>
-          <input
-            id="maxPriceCny"
-            type="number"
-            min="0"
-            value="40"
-            class="w-full border rounded-lg px-2 py-1 text-sm"
-          />
+
+        <div class="flex items-end">
+          <button
+            type="submit"
+            class="w-full md:w-auto px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
+          >
+            自動選品を実行する
+          </button>
         </div>
-      </div>
+      </form>
 
-      <div class="flex items-end">
-        <button
-          type="submit"
-          class="w-full md:w-auto px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
-        >
-          自動選品を実行する
-        </button>
-      </div>
-    </form>
+      <!-- 結果表示エリア（STEP1 セクション内） -->
+      <div id="autoSelectStatus" class="text-xs text-slate-500 mb-2"></div>
+      <div id="autoSelectResults" class="space-y-4 text-sm"></div>
+    </section>
 
-    <!-- ★ 結果表示エリアは STEP1 セクション内に置く ★ -->
-    <div id="autoSelectStatus" class="text-xs text-slate-500 mb-2"></div>
-    <div id="autoSelectResults" class="space-y-4 text-sm"></div>
-  </section>
-</main>
-
-    <!-- Step 2: 利益シミュレーション -->
-        <!-- 1688 URL インポート（半自動） -->
+    <!-- Step 2: 1688 URL インポート（半自動） -->
     <section id="profitSection" class="bg-white rounded-2xl shadow p-4 md:p-6">
       <h2 class="text-lg font-semibold mb-2">STEP2：楽天利益シミュレーション</h2>
-  <p class="text-sm text-slate-600 mb-4">
-    選んだ候補商品の仕入れ原価・物流費・楽天手数料をもとに、1商品あたりの利益を試算します。
-  </p>
+      <p class="text-sm text-slate-600 mb-4">
+        選んだ候補商品の仕入れ原価・物流費・楽天手数料をもとに、1商品あたりの利益を試算します。
+      </p>
 
       <form id="aliUrlForm" class="flex flex-col md:flex-row gap-2 mb-3">
         <input
@@ -176,7 +184,7 @@
       <div id="aliUrlResult" class="text-xs text-slate-500"></div>
     </section>
 
-
+    <!-- Step 2: 利益シミュレーション本体 -->
     <section class="bg-white rounded-2xl shadow p-4 md:p-6">
       <h2 class="text-lg font-semibold mb-2">STEP2：楽天利益シミュレーション</h2>
       <p class="text-sm text-slate-600 mb-4">
@@ -359,446 +367,407 @@
 
       <div id="listingResult" class="mt-4 text-sm space-y-3"></div>
     </section>
+
   </main>
 
   <script>
-   // ===== 共通：Token 管理 + secureFetch =====
-const TOKEN_STORAGE_KEY = "rakuten_agent_token";
-let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+    // ===== 共通：Token 管理 + secureFetch =====
+    const TOKEN_STORAGE_KEY = "rakuten_agent_token";
+    let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
 
-// 如果你有密码输入表单：<form id="agentTokenForm"> 和 <input id="agentTokenInput">
-document.addEventListener("DOMContentLoaded", () => {
-  const tokenForm = document.getElementById("agentTokenForm");
-  const tokenInput = document.getElementById("agentTokenInput");
-  const tokenStatus = document.getElementById("tokenStatus");
+    document.addEventListener("DOMContentLoaded", () => {
+      const tokenModal = document.getElementById("tokenModal");
+      const tokenForm = document.getElementById("agentTokenForm");
+      const tokenInput = document.getElementById("agentTokenInput");
+      const tokenError = document.getElementById("tokenError");
 
-  // 页面加载时，如果 localStorage 已有 token，就回填
-  if (tokenInput && agentToken) {
-    tokenInput.value = agentToken;
-  }
-
-  if (tokenForm && tokenInput) {
-    tokenForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      agentToken = (tokenInput.value || "").trim();
-      localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
-
-      if (tokenStatus) {
-        if (agentToken) {
-          tokenStatus.textContent = "パスワードを保存しました。";
-          tokenStatus.className = "mt-1 text-[11px] text-emerald-400";
-        } else {
-          tokenStatus.textContent = "パスワードを入力してください。";
-          tokenStatus.className = "mt-1 text-[11px] text-amber-400";
-        }
+      // 初回：token がなければモーダルを表示
+      if (!agentToken && tokenModal) {
+        tokenModal.classList.remove("hidden");
+      } else if (tokenModal) {
+        tokenModal.classList.add("hidden");
       }
-    });
-  }
-});
 
-// 后续所有 API 请求都通过 secureFetch，自动带上 X-Agent-Token
-async function secureFetch(path, options = {}) {
-  const baseUrl = window.location.origin;
-  const headers = Object.assign({}, options.headers || {});
+      if (tokenInput && agentToken) {
+        tokenInput.value = agentToken;
+      }
 
-  if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  // ★ 关键：把 token 写到请求头
-  if (agentToken) {
-    headers["X-Agent-Token"] = agentToken;
-  }
-
-  const resp = await fetch(baseUrl + path, {
-    ...options,
-    headers,
-  });
-
-  return resp;
-}
-
-  
-  async function handleStep1() {
-  const payload = { /* ... */ };
-
-  const resp = await secureFetch("/market_auto_select", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  if (!resp.ok) {
-    throw new Error("HTTP " + resp.status);
-  }
-
-  const data = await resp.json();
-  // 后面都用 data，而不是再声明 resp
-}
-
-async function handleStep2() {
-  const payload = { /* ... */ };
-
-  const resp = await secureFetch("/rakuten_profit_simulate", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  if (!resp.ok) {
-    throw new Error("HTTP " + resp.status);
-  }
-
-  const data = await resp.json();
-  // 用 data 渲染界面
-}
-
-async function handleStep3() {
-  const payload = { /* ... */ };
-
-  const resp = await secureFetch("/rakuten_listing_copy", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  if (!resp.ok) {
-    throw new Error("HTTP " + resp.status);
-  }
-
-  const data = await resp.json();
-  // 用 data.title_jp / data.bullets_jp ... 渲染文案
-}
-
-  
-  
-  
-  
- 
-      if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker
-        .register("/ui/service-worker.js")
-        .then((reg) => {
-          console.log("Service Worker registered:", reg.scope);
-        })
-        .catch((err) => {
-          console.log("Service Worker registration failed:", err);
+      if (tokenForm && tokenInput) {
+        tokenForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const value = (tokenInput.value || "").trim();
+          if (!value) {
+            if (tokenError) {
+              tokenError.textContent = "パスワードを入力してください。";
+            }
+            return;
+          }
+          agentToken = value;
+          localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
+          if (tokenError) tokenError.textContent = "";
+          if (tokenModal) tokenModal.classList.add("hidden");
         });
+      }
     });
-  }
 
-    // 全局变量：保存最近一次自動選品結果，方便带入利润测算/文案
+    async function secureFetch(path, options = {}) {
+      const baseUrl = window.location.origin;
+      const headers = Object.assign({}, options.headers || {});
+
+      if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+      }
+
+      if (agentToken) {
+        headers["X-Agent-Token"] = agentToken;
+      }
+
+      const resp = await fetch(baseUrl + path, {
+        ...options,
+        headers,
+      });
+
+      // 認証エラーのときはモーダルを再表示してエラー文言
+      if (resp.status === 401 || resp.status === 403) {
+        const tokenModal = document.getElementById("tokenModal");
+        const tokenError = document.getElementById("tokenError");
+        const tokenInput = document.getElementById("agentTokenInput");
+
+        agentToken = "";
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        if (tokenInput) tokenInput.value = "";
+        if (tokenError) tokenError.textContent = "パスワードが正しくありません。";
+        if (tokenModal) tokenModal.classList.remove("hidden");
+      }
+
+      return resp;
+    }
+
+    // Service Worker
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("/ui/service-worker.js")
+          .then((reg) => {
+            console.log("Service Worker registered:", reg.scope);
+          })
+          .catch((err) => {
+            console.log("Service Worker registration failed:", err);
+          });
+      });
+    }
+
+    // 全局：保存最新一次自動選品结果＆请求参数
     window.lastAutoSelectResults = [];
+    window.lastAutoSelectPayload = null;
 
+    // ===== STEP1：自動選品 =====
+    const autoSelectFormEl = document.getElementById("autoSelectForm");
+    if (autoSelectFormEl) {
+      autoSelectFormEl.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-// ===== STEP1：自動選品 =====
-const autoSelectFormEl = document.getElementById("autoSelectForm");
+        const statusEl = document.getElementById("autoSelectStatus");
+        const resultEl = document.getElementById("autoSelectResults");
 
-if (autoSelectFormEl) {
-  autoSelectFormEl.addEventListener("submit", async (e) => {
-    e.preventDefault();
+        if (!statusEl || !resultEl) {
+          console.warn("autoSelectStatus or autoSelectResults not found");
+          return;
+        }
 
-    const statusEl = document.getElementById("autoSelectStatus");
-    const resultEl = document.getElementById("autoSelectResults");
+        statusEl.textContent = "選品中...（/market_auto_select にリクエスト中）";
+        resultEl.innerHTML = "";
 
-    if (!statusEl || !resultEl) {
-      console.warn("autoSelectStatus or autoSelectResults not found");
-      return;
-    }
-
-    statusEl.textContent = "選品中...（/market_auto_select にリクエスト中）";
-    resultEl.innerHTML = "";
-
-    try {
-      const budgetSelect   = document.getElementById("budgetLevelSelect");
-      const avoidInput     = document.getElementById("avoidKeywordsInput");
-      const topKInput      = document.getElementById("topKCategories");
-      const maxItemsInput  = document.getElementById("maxItemsPerCategory");
-      const minPriceInput  = document.getElementById("minPriceCny");
-      const maxPriceInput  = document.getElementById("maxPriceCny");
-
-      const budget_level = (budgetSelect?.value || "low");
-
-      const rawAvoid = (avoidInput?.value || "");
-      const avoid_keywords = rawAvoid
-        .split(/[,，、\s]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      const top_k_categories = parseInt(topKInput?.value || "3", 10);
-      const max_items_per_category = parseInt(maxItemsInput?.value || "20", 10);
-      const min_price_cny = parseFloat(minPriceInput?.value || "5");
-      const max_price_cny = parseFloat(maxPriceInput?.value || "40");
-
-      const payload = {
-        budget_level,
-        avoid_keywords,
-        top_k_categories,
-        max_items_per_category,
-        min_price_cny,
-        max_price_cny,
-      };
-
-      // ★ 保存本次请求参数，给 CSV 下载复用
-      window.lastAutoSelectPayload = payload;
-
-      const resp = await secureFetch("/market_auto_select", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      if (!resp.ok) {
-        let msg = "HTTP " + resp.status;
         try {
-          const errJson = await resp.json();
-          if (errJson?.detail) msg = errJson.detail;
-        } catch (_) {}
-        throw new Error(msg);
-      }
+          const budgetSelect   = document.getElementById("budgetLevelSelect");
+          const avoidInput     = document.getElementById("avoidKeywordsInput");
+          const topKInput      = document.getElementById("topKCategories");
+          const maxItemsInput  = document.getElementById("maxItemsPerCategory");
+          const minPriceInput  = document.getElementById("minPriceCny");
+          const maxPriceInput  = document.getElementById("maxPriceCny");
 
-      const data = await resp.json();
+          const budget_level = (budgetSelect?.value || "low");
 
-      statusEl.textContent = "選品完了";
+          const rawAvoid = (avoidInput?.value || "");
+          const avoid_keywords = rawAvoid
+            .split(/[,，、\s]+/)
+            .map((s) => s.trim())
+            .filter(Boolean);
 
-      const suggestions = data.suggestions || data.results || [];
-      if (!suggestions.length) {
-        resultEl.textContent =
-          "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
-        return;
-      }
+          const top_k_categories = parseInt(topKInput?.value || "3", 10);
+          const max_items_per_category = parseInt(maxItemsInput?.value || "20", 10);
+          const min_price_cny = parseFloat(minPriceInput?.value || "5");
+          const max_price_cny = parseFloat(maxPriceInput?.value || "40");
 
-      // ★ 保存结果，给 useForProfit/useForListing 用
-      window.lastAutoSelectResults = suggestions;
+          const payload = {
+            budget_level,
+            avoid_keywords,
+            top_k_categories,
+            max_items_per_category,
+            min_price_cny,
+            max_price_cny,
+          };
 
-      // ★ 结果 UI + CSV 出力ボタン
-      let html = `
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-xs font-semibold text-slate-800">
-            自動選品結果（${suggestions.length} カテゴリ）
-          </div>
-          <button
-            type="button"
-            class="inline-flex items-center rounded bg-slate-800 px-3 py-1 text-[11px] font-semibold text-slate-50 hover:bg-slate-700"
-            onclick="downloadMarketCsv()"
-          >
-            CSV出力
-          </button>
-        </div>
-      `;
+          window.lastAutoSelectPayload = payload;
 
-      suggestions.forEach((cat, ci) => {
-        const jpCat = cat.jp_category || "";
-        const scene = cat.scene || "";
-        const trend = cat.trend_reason || "";
-        const kw1688 = cat.category_keyword_1688 || "";
-        const risk = cat.risk_level || "low";
-        const riskNotes = cat.risk_notes || "";
-        const items = cat.items || [];
+          const resp = await secureFetch("/market_auto_select", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
 
-        html += `
-          <div class="mb-4 rounded-lg border border-slate-300 bg-white shadow-sm">
-            <div class="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <div class="text-xs font-semibold text-slate-900">${jpCat}</div>
-                <div class="text-[11px] text-slate-600">${scene}</div>
+          if (!resp.ok) {
+            let msg = "HTTP " + resp.status;
+            try {
+              const errJson = await resp.json();
+              if (errJson?.detail) msg = errJson.detail;
+            } catch (_) {}
+            throw new Error(msg);
+          }
+
+          const data = await resp.json();
+          statusEl.textContent = "選品完了";
+
+          const suggestions = data.suggestions || data.results || [];
+          if (!suggestions.length) {
+            resultEl.textContent =
+              "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
+            return;
+          }
+
+          window.lastAutoSelectResults = suggestions;
+
+          let html = `
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-semibold text-slate-800">
+                自動選品結果（${suggestions.length} カテゴリ）
               </div>
-              <div class="flex flex-col items-end gap-1">
-                <span class="inline-flex items-center rounded-full border px-2 py-[1px] text-[10px]
-                             ${risk === "low" ? "border-emerald-400 text-emerald-600" :
-                               risk === "mid" ? "border-amber-400 text-amber-600" :
-                                                "border-red-400 text-red-600"}">
-                  リスク: ${risk}
-                </span>
-                ${
-                  kw1688
-                    ? `<span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-[1px] text-[10px] text-slate-700">
-                         1688 検索キーワード: ${kw1688}
-                       </span>`
-                    : ""
-                }
-              </div>
+              <button
+                type="button"
+                class="inline-flex items-center rounded bg-slate-800 px-3 py-1 text-[11px] font-semibold text-slate-50 hover:bg-slate-700"
+                onclick="downloadMarketCsv()"
+              >
+                CSV出力
+              </button>
             </div>
+          `;
 
-            <div class="px-3 py-2 border-b border-slate-200">
-              <div class="text-[11px] text-slate-600 whitespace-pre-line">
-                ${trend}
-              </div>
-              ${
-                riskNotes
-                  ? `<div class="mt-1 text-[11px] text-slate-500">注意点: ${riskNotes}</div>`
-                  : ""
-              }
-            </div>
+          suggestions.forEach((cat, ci) => {
+            const jpCat = cat.jp_category || "";
+            const scene = cat.scene || "";
+            const trend = cat.trend_reason || "";
+            const kw1688 = cat.category_keyword_1688 || "";
+            const risk = cat.risk_level || "low";
+            const riskNotes = cat.risk_notes || "";
+            const items = cat.items || [];
 
-            <div class="px-3 py-2">
-              ${
-                !items.length
-                  ? `<div class="text-[11px] text-slate-500">このカテゴリでは条件に合う候補商品が見つかりませんでした。</div>`
-                  : `
-                    <table class="w-full border-collapse text-[11px]">
-                      <thead>
-                        <tr class="border-b border-slate-200 bg-slate-50">
-                          <th class="px-1 py-1 text-left font-medium text-slate-600">#</th>
-                          <th class="px-1 py-1 text-left font-medium text-slate-600">商品タイトル（中国語）</th>
-                          <th class="px-1 py-1 text-right font-medium text-slate-600">仕入価格 (CNY)</th>
-                          <th class="px-1 py-1 text-right font-medium text-slate-600">スコア</th>
-                          <th class="px-1 py-1 text-center font-medium text-slate-600">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        ${items
-                          .map((item, ii) => {
-                            const t = item.title_cn || "";
-                            const price = item.price_cny ?? "";
-                            const score = item.score ?? "";
-                            return `
-                              <tr class="border-b border-slate-100 hover:bg-slate-50">
-                                <td class="px-1 py-1 align-top text-slate-500">${ii + 1}</td>
-                                <td class="px-1 py-1 align-top text-slate-800">${t}</td>
-                                <td class="px-1 py-1 align-top text-right text-slate-800">${price}</td>
-                                <td class="px-1 py-1 align-top text-right text-slate-800">${score}</td>
-                                <td class="px-1 py-1 align-top">
-                                  <div class="flex flex-col gap-1 items-stretch">
-                                    <button type="button"
-                                      class="w-full rounded bg-emerald-500 text-[10px] font-semibold text-white py-[3px]"
-                                      onclick="useForProfit(${ci}, ${ii})">
-                                      利益試算へ
-                                    </button>
-                                    <button type="button"
-                                      class="w-full rounded bg-indigo-500 text-[10px] font-semibold text-white py-[3px]"
-                                      onclick="useForListing(${ci}, ${ii})">
-                                      文案作成へ
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            `;
-                          })
-                          .join("")}
-                      </tbody>
-                    </table>
-                  `
-              }
-            </div>
-          </div>
-        `;
+            html += `
+              <div class="mb-4 rounded-lg border border-slate-300 bg-white shadow-sm">
+                <div class="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <div>
+                    <div class="text-xs font-semibold text-slate-900">${jpCat}</div>
+                    <div class="text-[11px] text-slate-600">${scene}</div>
+                  </div>
+                  <div class="flex flex-col items-end gap-1">
+                    <span class="inline-flex items-center rounded-full border px-2 py-[1px] text-[10px]
+                                 ${
+                                   risk === "low"
+                                     ? "border-emerald-400 text-emerald-600"
+                                     : risk === "mid"
+                                     ? "border-amber-400 text-amber-600"
+                                     : "border-red-400 text-red-600"
+                                 }">
+                      リスク: ${risk}
+                    </span>
+                    ${
+                      kw1688
+                        ? `<span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-[1px] text-[10px] text-slate-700">
+                             1688 検索キーワード: ${kw1688}
+                           </span>`
+                        : ""
+                    }
+                  </div>
+                </div>
+
+                <div class="px-3 py-2 border-b border-slate-200">
+                  <div class="text-[11px] text-slate-600 whitespace-pre-line">
+                    ${trend}
+                  </div>
+                  ${
+                    riskNotes
+                      ? `<div class="mt-1 text-[11px] text-slate-500">注意点: ${riskNotes}</div>`
+                      : ""
+                  }
+                </div>
+
+                <div class="px-3 py-2">
+                  ${
+                    !items.length
+                      ? `<div class="text-[11px] text-slate-500">このカテゴリでは条件に合う候補商品が見つかりませんでした。</div>`
+                      : `
+                        <table class="w-full border-collapse text-[11px]">
+                          <thead>
+                            <tr class="border-b border-slate-200 bg-slate-50">
+                              <th class="px-1 py-1 text-left font-medium text-slate-600">#</th>
+                              <th class="px-1 py-1 text-left font-medium text-slate-600">商品タイトル（中国語）</th>
+                              <th class="px-1 py-1 text-right font-medium text-slate-600">仕入価格 (CNY)</th>
+                              <th class="px-1 py-1 text-right font-medium text-slate-600">スコア</th>
+                              <th class="px-1 py-1 text-center font-medium text-slate-600">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${items
+                              .map((item, ii) => {
+                                const t = item.title_cn || "";
+                                const price = item.price_cny ?? "";
+                                const score = item.score ?? "";
+                                return `
+                                  <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                    <td class="px-1 py-1 align-top text-slate-500">${ii + 1}</td>
+                                    <td class="px-1 py-1 align-top text-slate-800">${t}</td>
+                                    <td class="px-1 py-1 align-top text-right text-slate-800">${price}</td>
+                                    <td class="px-1 py-1 align-top text-right text-slate-800">${score}</td>
+                                    <td class="px-1 py-1 align-top">
+                                      <div class="flex flex-col gap-1 items-stretch">
+                                        <button type="button"
+                                          class="w-full rounded bg-emerald-500 text-[10px] font-semibold text-white py-[3px]"
+                                          onclick="useForProfit(${ci}, ${ii})">
+                                          利益試算へ
+                                        </button>
+                                        <button type="button"
+                                          class="w-full rounded bg-indigo-500 text-[10px] font-semibold text-white py-[3px]"
+                                          onclick="useForListing(${ci}, ${ii})">
+                                          文案作成へ
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                `;
+                              })
+                              .join("")}
+                          </tbody>
+                        </table>
+                      `
+                  }
+                </div>
+              </div>
+            `;
+          });
+
+          resultEl.innerHTML = html;
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = "自動選品に失敗しました：" + err;
+          resultEl.innerHTML =
+            '<p class="text-xs text-red-500">1688 側との通信に問題が発生しました。しばらくしてから再度お試しください。</p>';
+        }
       });
-
-      resultEl.innerHTML = html;
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent = "自動選品に失敗しました：" + err;
-      resultEl.innerHTML =
-        '<p class="text-xs text-red-500">1688 側との通信に問題が発生しました。しばらくしてから再度お試しください。</p>';
-    }
-  });
-}
-
-
-// ===== CSV 出力（STEP1 の結果を CSV エクスポート） =====
-window.downloadMarketCsv = async function () {
-  try {
-    const payload = window.lastAutoSelectPayload;
-    if (!payload) {
-      alert("先に一度『自動選品』を実行してください。");
-      return;
     }
 
-    const resp = await secureFetch("/market_auto_select_csv", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      let msg = "HTTP " + resp.status;
+    // ===== CSV 出力（STEP1 結果を CSV エクスポート） =====
+    window.downloadMarketCsv = async function () {
       try {
-        const errJson = await resp.json();
-        if (errJson?.detail) msg = errJson.detail;
-      } catch (_) {}
-      throw new Error(msg);
-    }
+        const payload = window.lastAutoSelectPayload;
+        if (!payload) {
+          alert("先に一度『自動選品』を実行してください。");
+          return;
+        }
 
-    const csvText = await resp.text();
+        const resp = await secureFetch("/market_auto_select_csv", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
 
-    const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const now = new Date();
-    const ts = now.toISOString().slice(0, 19).replace(/[-T:]/g, "");
-    a.download = `market_auto_select_${ts}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    alert("CSV 出力に失敗しました：" + err);
-  }
-};
+        if (!resp.ok) {
+          let msg = "HTTP " + resp.status;
+          try {
+            const errJson = await resp.json();
+            if (errJson?.detail) msg = errJson.detail;
+          } catch (_) {}
+          throw new Error(msg);
+        }
 
-// ===== STEP1 → STEP2/3 連携（滚动到对应区域） =====
-window.useForProfit = function (catIndex, itemIndex) {
-  const cats = window.lastAutoSelectResults || [];
-  const cat = cats[catIndex];
-  if (!cat) return;
-  const item = (cat.items || [])[itemIndex];
-  if (!item) return;
+        const csvText = await resp.text();
+        // ★ Excel で文字化けしないように UTF-8 BOM を付与
+        const csvWithBom = "\uFEFF" + csvText;
 
-  const idInput = document.getElementById("profitProductId");
-  const titleInput = document.getElementById("profitTitleCn");
-  const costInput = document.getElementById("costCny");
+        const blob = new Blob([csvWithBom], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const now = new Date();
+        const ts = now.toISOString().slice(0, 19).replace(/[-T:]/g, "");
+        a.href = url;
+        a.download = `market_auto_select_${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert("CSV 出力に失敗しました：" + err);
+      }
+    };
 
-  if (idInput) {
-    idInput.value =
-      (cat.jp_category || "cat") + "_" + (item.id || ("i" + itemIndex));
-  }
-  if (titleInput) {
-    titleInput.value = item.title_cn || "";
-  }
-  if (costInput) {
-    costInput.value = item.price_cny ?? "";
-  }
+    // ===== STEP1 → STEP2/3 連携 =====
+    window.useForProfit = function (catIndex, itemIndex) {
+      const cats = window.lastAutoSelectResults || [];
+      const cat = cats[catIndex];
+      if (!cat) return;
+      const item = (cat.items || [])[itemIndex];
+      if (!item) return;
 
-  // ★ 滚动到利益試算区
-  const section = document.getElementById("profitSection");
-  if (section && section.scrollIntoView) {
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-};
+      const idInput = document.getElementById("profitProductId");
+      const titleInput = document.getElementById("profitTitleCn");
+      const costInput = document.getElementById("costCny");
 
-window.useForListing = function (catIndex, itemIndex) {
-  const cats = window.lastAutoSelectResults || [];
-  const cat = cats[catIndex];
-  if (!cat) return;
-  const item = (cat.items || [])[itemIndex];
-  if (!item) return;
+      if (idInput) {
+        idInput.value =
+          (cat.jp_category || "cat") + "_" + (item.id || ("i" + itemIndex));
+      }
+      if (titleInput) {
+        titleInput.value = item.title_cn || "";
+      }
+      if (costInput) {
+        costInput.value = item.price_cny ?? "";
+      }
 
-  const titleInput = document.getElementById("listingTitleCn");
-  const descInput = document.getElementById("listingDescCn");
-  const kwInput = document.getElementById("listingKeywordsJp");
+      const section = document.getElementById("profitSection");
+      if (section && section.scrollIntoView) {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
 
-  if (titleInput) {
-    titleInput.value = item.title_cn || "";
-  }
-  if (descInput) {
-    descInput.value = "";
-  }
-  if (kwInput) {
-    kwInput.value = (cat.jp_category || "")
-      .replace("Amazon｜", "")
-      .replace(/[（）\(\)]/g, " ");
-  }
+    window.useForListing = function (catIndex, itemIndex) {
+      const cats = window.lastAutoSelectResults || [];
+      const cat = cats[catIndex];
+      if (!cat) return;
+      const item = (cat.items || [])[itemIndex];
+      if (!item) return;
 
-  // ★ 滚动到文案生成区
-  const section = document.getElementById("listingSection");
-  if (section && section.scrollIntoView) {
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-};
+      const titleInput = document.getElementById("listingTitleCn");
+      const descInput = document.getElementById("listingDescCn");
+      const kwInput = document.getElementById("listingKeywordsJp");
 
+      if (titleInput) {
+        titleInput.value = item.title_cn || "";
+      }
+      if (descInput) {
+        descInput.value = "";
+      }
+      if (kwInput) {
+        kwInput.value = (cat.jp_category || "")
+          .replace("Amazon｜", "")
+          .replace(/[（）\(\)]/g, " ");
+      }
 
-    // STEP2: 利益シミュレーション
+      const section = document.getElementById("listingSection");
+      if (section && section.scrollIntoView) {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
 
-    
+    // ===== STEP2: 利益シミュレーション =====
     document.getElementById("profitForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const resultEl = document.getElementById("profitResult");
@@ -831,10 +800,10 @@ window.useForListing = function (catIndex, itemIndex) {
       };
 
       try {
-       const resp = await secureFetch("/rakuten_profit_simulate", {
-  method: "POST",
-  body: JSON.stringify(payload),
-});
+        const resp = await secureFetch("/rakuten_profit_simulate", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
 
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
@@ -864,7 +833,7 @@ window.useForListing = function (catIndex, itemIndex) {
       }
     });
 
-    // STEP3: 楽天商品ページ文案生成
+    // ===== STEP3: 楽天商品ページ文案生成 =====
     document.getElementById("listingForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const resultEl = document.getElementById("listingResult");
@@ -889,9 +858,9 @@ window.useForListing = function (catIndex, itemIndex) {
 
       try {
         const resp = await secureFetch("/rakuten_listing_copy", {
-  method: "POST",
-  body: JSON.stringify(payload),
-});
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
 
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
@@ -938,99 +907,90 @@ window.useForListing = function (catIndex, itemIndex) {
       }
     });
 
+    // ===== 1688 URL インポート（STEP2） =====
+    let lastParsed1688Item = null;
 
+    const aliUrlForm = document.getElementById("aliUrlForm");
+    if (aliUrlForm) {
+      aliUrlForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const urlInput = document.getElementById("aliUrlInput");
+        const url = (urlInput.value || "").trim();
+        const resultEl = document.getElementById("aliUrlResult");
 
-  // ... 这里已经有 secureFetch / 各种事件监听，不动它们 ...
-
-  // ===== 1688 URL インポート（PC用） =====
-  let lastParsed1688Item = null;
-
-  const aliUrlForm = document.getElementById("aliUrlForm");
-  if (aliUrlForm) {
-    aliUrlForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const urlInput = document.getElementById("aliUrlInput");
-      const url = (urlInput.value || "").trim();
-      const resultEl = document.getElementById("aliUrlResult");
-
-      if (!url) {
-        resultEl.innerHTML =
-          "<div class='text-xs text-red-500'>1688 の商品URLを入力してください。</div>";
-        return;
-      }
-
-      resultEl.innerHTML =
-        "<div class='text-xs text-slate-500'>解析中...</div>";
-
-      try {
-        const resp = await secureFetch("/ali1688/parse_url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
-
-        if (!resp.ok) {
-          const errJson = await resp.json().catch(() => null);
-          const msg = errJson?.detail || ("HTTP " + resp.status);
-          throw new Error(msg);
+        if (!url) {
+          resultEl.innerHTML =
+            "<div class='text-xs text-red-500'>1688 の商品URLを入力してください。</div>";
+          return;
         }
 
-        const data = await resp.json();
-        lastParsed1688Item = data;
-
-        resultEl.innerHTML = `
-          <div class="border border-emerald-200 rounded-lg p-3 text-xs space-y-2">
-            <div class="font-semibold text-slate-800 mb-1">解析結果</div>
-            <div><span class="font-medium">タイトル（CN）：</span>${data.title_cn || "(取得できませんでした)"}</div>
-            <div><span class="font-medium">価格（CNY）：</span>${data.price_cny ?? "(不明)"}</div>
-            <div class="flex flex-wrap gap-2 mt-1">
-              <button type="button"
-                class="px-2 py-1 rounded bg-emerald-600 text-white"
-                onclick="applyParsed1688ToProfit()">
-                利益試算に反映
-              </button>
-              <button type="button"
-                class="px-2 py-1 rounded bg-indigo-600 text-white"
-                onclick="applyParsed1688ToListing()">
-                文案生成に反映
-              </button>
-            </div>
-          </div>
-        `;
-      } catch (err) {
-        console.error(err);
         resultEl.innerHTML =
-          "<div class='text-xs text-red-500'>解析に失敗しました：" + err + "</div>";
+          "<div class='text-xs text-slate-500'>解析中...</div>";
+
+        try {
+          const resp = await secureFetch("/ali1688/parse_url", {
+            method: "POST",
+            body: JSON.stringify({ url }),
+          });
+
+          if (!resp.ok) {
+            const errJson = await resp.json().catch(() => null);
+            const msg = errJson?.detail || ("HTTP " + resp.status);
+            throw new Error(msg);
+          }
+
+          const data = await resp.json();
+          lastParsed1688Item = data;
+
+          resultEl.innerHTML = `
+            <div class="border border-emerald-200 rounded-lg p-3 text-xs space-y-2">
+              <div class="font-semibold text-slate-800 mb-1">解析結果</div>
+              <div><span class="font-medium">タイトル（CN）：</span>${data.title_cn || "(取得できませんでした)"}</div>
+              <div><span class="font-medium">価格（CNY）：</span>${data.price_cny ?? "(不明)"}</div>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <button type="button"
+                  class="px-2 py-1 rounded bg-emerald-600 text-white"
+                  onclick="applyParsed1688ToProfit()">
+                  利益試算に反映
+                </button>
+                <button type="button"
+                  class="px-2 py-1 rounded bg-indigo-600 text-white"
+                  onclick="applyParsed1688ToListing()">
+                  文案生成に反映
+                </button>
+              </div>
+            </div>
+          `;
+        } catch (err) {
+          console.error(err);
+          resultEl.innerHTML =
+            "<div class='text-xs text-red-500'>解析に失敗しました：" + err + "</div>";
+        }
+      });
+    }
+
+    window.applyParsed1688ToProfit = function () {
+      if (!lastParsed1688Item) return;
+      const it = lastParsed1688Item;
+      const titleInput = document.getElementById("profitTitleCn");
+      const costInput = document.getElementById("costCny");
+
+      if (titleInput && it.title_cn) {
+        titleInput.value = it.title_cn;
       }
-    });
-  }
+      if (costInput && typeof it.price_cny === "number") {
+        costInput.value = it.price_cny;
+      }
+    };
 
-  window.applyParsed1688ToProfit = function () {
-    if (!lastParsed1688Item) return;
-    const it = lastParsed1688Item;
-    const titleInput = document.getElementById("profitTitleCn");
-    const costInput = document.getElementById("costCny");
-
-    if (titleInput && it.title_cn) {
-      titleInput.value = it.title_cn;
-    }
-    if (costInput && typeof it.price_cny === "number") {
-      costInput.value = it.price_cny;
-    }
-  };
-
-  window.applyParsed1688ToListing = function () {
-    if (!lastParsed1688Item) return;
-    const it = lastParsed1688Item;
-    const titleInput = document.getElementById("listingTitleCn");
-    if (titleInput && it.title_cn) {
-      titleInput.value = it.title_cn;
-    }
-  };
+    window.applyParsed1688ToListing = function () {
+      if (!lastParsed1688Item) return;
+      const it = lastParsed1688Item;
+      const titleInput = document.getElementById("listingTitleCn");
+      if (titleInput && it.title_cn) {
+        titleInput.value = it.title_cn;
+      }
+    };
   </script>
-
-    ...
-  <!-- 这里是 STEP1 自動選品 的 section 结束 -->
-
 </body>
 </html>

@@ -372,43 +372,75 @@
 
   <script>
     // ===== 共通：Token 管理 + secureFetch =====
-    const TOKEN_STORAGE_KEY = "rakuten_agent_token";
-    let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+   // ===== 共通：Token 管理 + secureFetch（毎回ページ読み込み時にモーダルを出す版） =====
+let agentToken = "";  // ページをリロードしたら毎回リセット
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const tokenModal = document.getElementById("tokenModal");
-      const tokenForm = document.getElementById("agentTokenForm");
-      const tokenInput = document.getElementById("agentTokenInput");
-      const tokenError = document.getElementById("tokenError");
+document.addEventListener("DOMContentLoaded", () => {
+  const tokenModal = document.getElementById("tokenModal");
+  const tokenForm = document.getElementById("agentTokenForm");
+  const tokenInput = document.getElementById("agentTokenInput");
+  const tokenError = document.getElementById("tokenError");
 
-      // 初回：token がなければモーダルを表示
-      if (!agentToken && tokenModal) {
-        tokenModal.classList.remove("hidden");
-      } else if (tokenModal) {
-        tokenModal.classList.add("hidden");
+  // ページ読み込み時：必ず一度モーダルを表示
+  if (tokenModal) {
+    tokenModal.classList.remove("hidden");
+  }
+
+  if (tokenForm && tokenInput) {
+    tokenForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const value = (tokenInput.value || "").trim();
+
+      if (!value) {
+        if (tokenError) {
+          tokenError.textContent = "パスワードを入力してください。";
+        }
+        return;
       }
 
-      if (tokenInput && agentToken) {
-        tokenInput.value = agentToken;
-      }
+      // メモリ上にだけ保存（localStorage は使わない）
+      agentToken = value;
 
-      if (tokenForm && tokenInput) {
-        tokenForm.addEventListener("submit", (e) => {
-          e.preventDefault();
-          const value = (tokenInput.value || "").trim();
-          if (!value) {
-            if (tokenError) {
-              tokenError.textContent = "パスワードを入力してください。";
-            }
-            return;
-          }
-          agentToken = value;
-          localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
-          if (tokenError) tokenError.textContent = "";
-          if (tokenModal) tokenModal.classList.add("hidden");
-        });
-      }
+      if (tokenError) tokenError.textContent = "";
+      if (tokenModal) tokenModal.classList.add("hidden");
     });
+  }
+});
+
+// 后续所有 API 请求都通过 secureFetch，自动带上 X-Agent-Token
+async function secureFetch(path, options = {}) {
+  const baseUrl = window.location.origin;
+  const headers = Object.assign({}, options.headers || {});
+
+  if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  // ★ 关键：把 token 写到请求头
+  if (agentToken) {
+    headers["X-Agent-Token"] = agentToken;
+  }
+
+  const resp = await fetch(baseUrl + path, {
+    ...options,
+    headers,
+  });
+
+  // 如果后端返回 401/403，认为是密码错误 → 重新弹框＋提示
+  if (resp.status === 401 || resp.status === 403) {
+    const tokenModal = document.getElementById("tokenModal");
+    const tokenError = document.getElementById("tokenError");
+    const tokenInput = document.getElementById("agentTokenInput");
+
+    agentToken = "";  // 当前 token 作废
+    if (tokenInput) tokenInput.value = "";
+    if (tokenError) tokenError.textContent = "パスワードが正しくありません。";
+    if (tokenModal) tokenModal.classList.remove("hidden");
+  }
+
+  return resp;
+}
+
 
     async function secureFetch(path, options = {}) {
       const baseUrl = window.location.origin;

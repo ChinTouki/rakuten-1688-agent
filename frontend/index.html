@@ -375,6 +375,9 @@
    // ===== 共通：Token 管理 + secureFetch（毎回ページ読み込み時にモーダルを出す版） =====
 let agentToken = "";  // ページをリロードしたら毎回リセット
 
+// =======================
+// パスワードモーダル処理
+// =======================
 document.addEventListener("DOMContentLoaded", () => {
   const tokenModal = document.getElementById("tokenModal");
   const tokenForm = document.getElementById("agentTokenForm");
@@ -382,56 +385,72 @@ document.addEventListener("DOMContentLoaded", () => {
   const tokenError = document.getElementById("tokenError");
 
   // ページ読み込み時：必ず一度モーダルを表示
+  if (tokenModal) {
+    tokenModal.classList.remove("hidden");
+  }
+
   if (tokenForm && tokenInput) {
-  tokenForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const value = (tokenInput.value || "").trim();
+    tokenForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    if (!value) {
-      if (tokenError) {
-        tokenError.textContent = "パスワードを入力してください。";
+      const value = (tokenInput.value || "").trim();
+      console.log("[token] submit value =", value);
+
+      if (!value) {
+        if (tokenError) {
+          tokenError.textContent = "パスワードを入力してください。";
+        }
+        return;
       }
-      return;
-    }
 
-    // 先暂存到内存
-    agentToken = value;
+      // 先暂存到内存（真正是否正确，要以 /auth/check 为准）
+      agentToken = value;
 
-    // 调用后端 /auth/check 做一次校验
-    try {
-      const baseUrl = window.location.origin;
-      const resp = await fetch(baseUrl + "/auth/check", {
-        method: "GET",
-        headers: {
-          "X-Agent-Token": agentToken,
-        },
-      });
+      try {
+        const baseUrl = window.location.origin;
+        const resp = await fetch(baseUrl + "/auth/check", {
+          method: "GET",
+          headers: {
+            "X-Agent-Token": agentToken,
+          },
+        });
 
-      if (resp.ok) {
-        // 密码正确
-        if (tokenError) tokenError.textContent = "";
-        if (tokenModal) tokenModal.classList.add("hidden");
-      } else if (resp.status === 401 || resp.status === 403) {
-        // 密码错误 → 提示 + 不关弹窗
+        console.log("[token] /auth/check status =", resp.status);
+
+        if (resp.ok) {
+          // 密码正确
+          if (tokenError) tokenError.textContent = "";
+          if (tokenModal) tokenModal.classList.add("hidden");
+          console.log("[token] auth OK, modal closed");
+        } else if (resp.status === 401 || resp.status === 403) {
+          // 密码错误 → 清空 token + 显示错误，不关弹窗
+          agentToken = "";
+          if (tokenError) {
+            tokenError.textContent = "パスワードが正しくありません。";
+          }
+          console.log("[token] auth NG (401/403)");
+        } else {
+          // 其他 HTTP 错误
+          agentToken = "";
+          if (tokenError) {
+            tokenError.textContent =
+              "通信エラーが発生しました。時間をおいて再度お試しください。";
+          }
+          console.log("[token] auth NG (other http error)");
+        }
+      } catch (err) {
+        // 网络或 JS 异常
+        console.error("[token] auth error:", err);
         agentToken = "";
         if (tokenError) {
-          tokenError.textContent = "パスワードが正しくありません。";
-        }
-      } else {
-        // 其他错误（网络异常等）
-        agentToken = "";
-        if (tokenError) {
-          tokenError.textContent = "通信エラーが発生しました。時間をおいて再度お試しください。";
+          tokenError.textContent =
+            "通信エラーが発生しました。時間をおいて再度お試しください。";
         }
       }
-    } catch (err) {
-      agentToken = "";
-      if (tokenError) {
-        tokenError.textContent = "通信エラーが発生しました。時間をおいて再度お試しください。";
-      }
-    }
-  });
-}
+    });
+  }
+});
+
 
 
 // 后续所有 API 请求都通过 secureFetch，自动带上 X-Agent-Token

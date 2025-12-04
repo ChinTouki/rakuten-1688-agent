@@ -162,12 +162,11 @@
 
     <!-- Step 2: 利益シミュレーション -->
         <!-- 1688 URL インポート（半自動） -->
-    <section class="bg-white rounded-2xl shadow p-4 md:p-6">
-      <h2 class="text-lg font-semibold mb-2">STEP1.5：1688 商品URLインポート（半自動）</h2>
-      <p class="text-sm text-slate-600 mb-3">
-        1688 で目視選定した商品URLを貼り付けて、タイトルと仕入れ単価を自動取得します。
-        取得できない場合は、ブラウザで開いて手動でコピーしてください。
-      </p>
+    <section id="profitSection" class="bg-white rounded-2xl shadow p-4 md:p-6">
+      <h2 class="text-lg font-semibold mb-2">STEP2：楽天利益シミュレーション</h2>
+  <p class="text-sm text-slate-600 mb-4">
+    選んだ候補商品の仕入れ原価・物流費・楽天手数料をもとに、1商品あたりの利益を試算します。
+  </p>
 
       <form id="aliUrlForm" class="flex flex-col md:flex-row gap-2 mb-3">
         <input
@@ -308,7 +307,7 @@
     </section>
 
     <!-- Step 3: 商品ページ文案生成 -->
-    <section class="bg-white rounded-2xl shadow p-4 md:p-6 mb-10">
+    <section id="listingSection" class="bg-white rounded-2xl shadow p-4 md:p-6">
       <h2 class="text-lg font-semibold mb-2">STEP3：楽天商品ページ文案生成</h2>
       <p class="text-sm text-slate-600 mb-4">
         1688 の中国語情報から、楽天向けの日本語タイトル・箇条書き・説明文・検索キーワードを自動生成します。
@@ -500,7 +499,8 @@ async function handleStep3() {
     window.lastAutoSelectResults = [];
 
     // ===== STEP1：自動選品（PC） =====
-  // ===== STEP1：自動選品（PC） =====
+
+// ===== STEP1：自動選品（PC） =====
 const marketFormPC = document.getElementById("marketForm");
 if (marketFormPC) {
   marketFormPC.addEventListener("submit", async (e) => {
@@ -547,6 +547,9 @@ if (marketFormPC) {
         max_price_cny,
       };
 
+      // ★ 保存本次请求参数，给 CSV 下载复用
+      window.lastAutoSelectPayload = payload;
+
       const resp = await secureFetch("/market_auto_select", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -565,118 +568,131 @@ if (marketFormPC) {
 
       statusEl.textContent = "選品完了";
 
-    const suggestions = data.suggestions || data.results || [];
-if (!suggestions.length) {
-  resultEl.textContent =
-    "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
-  return;
-}
+      const suggestions = data.suggestions || data.results || [];
+      if (!suggestions.length) {
+        resultEl.textContent =
+          "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
+        return;
+      }
 
-// ★ 保存选品结果，给 STEP2/3 的按钮用
-window.lastAutoSelectResults = suggestions;
+      // ★ 保存结果，给 useForProfit/useForListing 用
+      window.lastAutoSelectResults = suggestions;
 
-// ★ 把结果渲染成「类目卡片 + SKU 列表」
-let html = "";
-
-suggestions.forEach((cat, ci) => {
-  const jpCat = cat.jp_category || "";
-  const scene = cat.scene || "";
-  const trend = cat.trend_reason || "";
-  const kw1688 = cat.category_keyword_1688 || "";
-  const risk = cat.risk_level || "low";
-  const riskNotes = cat.risk_notes || "";
-  const items = cat.items || [];
-
-  html += `
-    <div class="mb-4 rounded-lg border border-slate-300 bg-white shadow-sm">
-      <div class="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-        <div>
-          <div class="text-xs font-semibold text-slate-900">${jpCat}</div>
-          <div class="text-[11px] text-slate-600">${scene}</div>
+      // ★ 结果 UI + CSV 出力ボタン
+      let html = `
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs font-semibold text-slate-800">
+            自動選品結果（${suggestions.length} カテゴリ）
+          </div>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-slate-800 px-3 py-1 text-[11px] font-semibold text-slate-50 hover:bg-slate-700"
+            onclick="downloadMarketCsv()"
+          >
+            CSV出力
+          </button>
         </div>
-        <div class="flex flex-col items-end gap-1">
-          <span class="inline-flex items-center rounded-full border px-2 py-[1px] text-[10px]
-                       ${risk === "low" ? "border-emerald-400 text-emerald-600" :
-                         risk === "mid" ? "border-amber-400 text-amber-600" :
-                                          "border-red-400 text-red-600"}">
-            リスク: ${risk}
-          </span>
-          ${kw1688
-            ? `<span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-[1px] text-[10px] text-slate-700">
-                 1688 検索キーワード: ${kw1688}
-               </span>`
-            : ""
-          }
-        </div>
-      </div>
+      `;
 
-      <div class="px-3 py-2 border-b border-slate-200">
-        <div class="text-[11px] text-slate-600 whitespace-pre-line">
-          ${trend}
-        </div>
-        ${riskNotes
-          ? `<div class="mt-1 text-[11px] text-slate-500">注意点: ${riskNotes}</div>`
-          : ""
-        }
-      </div>
+      suggestions.forEach((cat, ci) => {
+        const jpCat = cat.jp_category || "";
+        const scene = cat.scene || "";
+        const trend = cat.trend_reason || "";
+        const kw1688 = cat.category_keyword_1688 || "";
+        const risk = cat.risk_level || "low";
+        const riskNotes = cat.risk_notes || "";
+        const items = cat.items || [];
 
-      <div class="px-3 py-2">
-        ${
-          !items.length
-            ? `<div class="text-[11px] text-slate-500">このカテゴリでは条件に合う候補商品が見つかりませんでした。</div>`
-            : `
-              <table class="w-full border-collapse text-[11px]">
-                <thead>
-                  <tr class="border-b border-slate-200 bg-slate-50">
-                    <th class="px-1 py-1 text-left font-medium text-slate-600">#</th>
-                    <th class="px-1 py-1 text-left font-medium text-slate-600">商品タイトル（中国語）</th>
-                    <th class="px-1 py-1 text-right font-medium text-slate-600">仕入価格 (CNY)</th>
-                    <th class="px-1 py-1 text-right font-medium text-slate-600">スコア</th>
-                    <th class="px-1 py-1 text-center font-medium text-slate-600">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${items
-                    .map((item, ii) => {
-                      const t = item.title_cn || "";
-                      const price = item.price_cny ?? "";
-                      const score = item.score ?? "";
-                      return `
-                        <tr class="border-b border-slate-100 hover:bg-slate-50">
-                          <td class="px-1 py-1 align-top text-slate-500">${ii + 1}</td>
-                          <td class="px-1 py-1 align-top text-slate-800">${t}</td>
-                          <td class="px-1 py-1 align-top text-right text-slate-800">${price}</td>
-                          <td class="px-1 py-1 align-top text-right text-slate-800">${score}</td>
-                          <td class="px-1 py-1 align-top">
-                            <div class="flex flex-col gap-1 items-stretch">
-                              <button type="button"
-                                class="w-full rounded bg-emerald-500 text-[10px] font-semibold text-white py-[3px]"
-                                onclick="useForProfit(${ci}, ${ii})">
-                                利益試算へ
-                              </button>
-                              <button type="button"
-                                class="w-full rounded bg-indigo-500 text-[10px] font-semibold text-white py-[3px]"
-                                onclick="useForListing(${ci}, ${ii})">
-                                文案作成へ
-                              </button>
-                            </div>
-                          </td>
+        html += `
+          <div class="mb-4 rounded-lg border border-slate-300 bg-white shadow-sm">
+            <div class="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-900">${jpCat}</div>
+                <div class="text-[11px] text-slate-600">${scene}</div>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                <span class="inline-flex items-center rounded-full border px-2 py-[1px] text-[10px]
+                             ${risk === "low" ? "border-emerald-400 text-emerald-600" :
+                               risk === "mid" ? "border-amber-400 text-amber-600" :
+                                                "border-red-400 text-red-600"}">
+                  リスク: ${risk}
+                </span>
+                ${
+                  kw1688
+                    ? `<span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-[1px] text-[10px] text-slate-700">
+                         1688 検索キーワード: ${kw1688}
+                       </span>`
+                    : ""
+                }
+              </div>
+            </div>
+
+            <div class="px-3 py-2 border-b border-slate-200">
+              <div class="text-[11px] text-slate-600 whitespace-pre-line">
+                ${trend}
+              </div>
+              ${
+                riskNotes
+                  ? `<div class="mt-1 text-[11px] text-slate-500">注意点: ${riskNotes}</div>`
+                  : ""
+              }
+            </div>
+
+            <div class="px-3 py-2">
+              ${
+                !items.length
+                  ? `<div class="text-[11px] text-slate-500">このカテゴリでは条件に合う候補商品が見つかりませんでした。</div>`
+                  : `
+                    <table class="w-full border-collapse text-[11px]">
+                      <thead>
+                        <tr class="border-b border-slate-200 bg-slate-50">
+                          <th class="px-1 py-1 text-left font-medium text-slate-600">#</th>
+                          <th class="px-1 py-1 text-left font-medium text-slate-600">商品タイトル（中国語）</th>
+                          <th class="px-1 py-1 text-right font-medium text-slate-600">仕入価格 (CNY)</th>
+                          <th class="px-1 py-1 text-right font-medium text-slate-600">スコア</th>
+                          <th class="px-1 py-1 text-center font-medium text-slate-600">操作</th>
                         </tr>
-                      `;
-                    })
-                    .join("")
-                  }
-                </tbody>
-              </table>
-            `
-        }
-      </div>
-    </div>
-  `;
-});
+                      </thead>
+                      <tbody>
+                        ${items
+                          .map((item, ii) => {
+                            const t = item.title_cn || "";
+                            const price = item.price_cny ?? "";
+                            const score = item.score ?? "";
+                            return `
+                              <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                <td class="px-1 py-1 align-top text-slate-500">${ii + 1}</td>
+                                <td class="px-1 py-1 align-top text-slate-800">${t}</td>
+                                <td class="px-1 py-1 align-top text-right text-slate-800">${price}</td>
+                                <td class="px-1 py-1 align-top text-right text-slate-800">${score}</td>
+                                <td class="px-1 py-1 align-top">
+                                  <div class="flex flex-col gap-1 items-stretch">
+                                    <button type="button"
+                                      class="w-full rounded bg-emerald-500 text-[10px] font-semibold text-white py-[3px]"
+                                      onclick="useForProfit(${ci}, ${ii})">
+                                      利益試算へ
+                                    </button>
+                                    <button type="button"
+                                      class="w-full rounded bg-indigo-500 text-[10px] font-semibold text-white py-[3px]"
+                                      onclick="useForListing(${ci}, ${ii})">
+                                      文案作成へ
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            `;
+                          })
+                          .join("")}
+                      </tbody>
+                    </table>
+                  `
+              }
+            </div>
+          </div>
+        `;
+      });
 
-resultEl.innerHTML = html;
-
+      resultEl.innerHTML = html;
     } catch (err) {
       console.error(err);
       statusEl.textContent = "自動選品に失敗しました：" + err;
@@ -686,33 +702,112 @@ resultEl.innerHTML = html;
   });
 }
 
-// STEP1 → STEP2/3 連携用
+// ===== CSV 出力（STEP1 の結果を CSV エクスポート） =====
+window.downloadMarketCsv = async function () {
+  try {
+    const payload = window.lastAutoSelectPayload;
+    if (!payload) {
+      alert("先に一度『自動選品』を実行してください。");
+      return;
+    }
+
+    const resp = await secureFetch("/market_auto_select_csv", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      let msg = "HTTP " + resp.status;
+      try {
+        const errJson = await resp.json();
+        if (errJson?.detail) msg = errJson.detail;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
+    const csvText = await resp.text();
+
+    const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const now = new Date();
+    const ts = now.toISOString().slice(0, 19).replace(/[-T:]/g, "");
+    a.download = `market_auto_select_${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    alert("CSV 出力に失敗しました：" + err);
+  }
+};
+
+// ===== STEP1 → STEP2/3 連携（滚动到对应区域） =====
 window.useForProfit = function (catIndex, itemIndex) {
-  const cat = (window.lastAutoSelectResults || [])[catIndex];
+  const cats = window.lastAutoSelectResults || [];
+  const cat = cats[catIndex];
   if (!cat) return;
   const item = (cat.items || [])[itemIndex];
   if (!item) return;
 
-  document.getElementById("profitProductId").value =
-    (cat.jp_category || "cat") + "_" + (item.id || ("i" + itemIndex));
-  document.getElementById("profitTitleCn").value = item.title_cn || "";
-  document.getElementById("costCny").value = item.price_cny ?? "";
+  const idInput = document.getElementById("profitProductId");
+  const titleInput = document.getElementById("profitTitleCn");
+  const costInput = document.getElementById("costCny");
+
+  if (idInput) {
+    idInput.value =
+      (cat.jp_category || "cat") + "_" + (item.id || ("i" + itemIndex));
+  }
+  if (titleInput) {
+    titleInput.value = item.title_cn || "";
+  }
+  if (costInput) {
+    costInput.value = item.price_cny ?? "";
+  }
+
+  // ★ 滚动到利益試算区
+  const section = document.getElementById("profitSection");
+  if (section && section.scrollIntoView) {
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 };
 
 window.useForListing = function (catIndex, itemIndex) {
-  const cat = (window.lastAutoSelectResults || [])[catIndex];
+  const cats = window.lastAutoSelectResults || [];
+  const cat = cats[catIndex];
   if (!cat) return;
   const item = (cat.items || [])[itemIndex];
   if (!item) return;
 
-  document.getElementById("listingTitleCn").value = item.title_cn || "";
-  document.getElementById("listingDescCn").value = "";
-  document.getElementById("listingKeywordsJp").value =
-    (cat.jp_category || "").replace("Amazon｜", "").replace(/[（）\(\)]/g, " ");
+  const titleInput = document.getElementById("listingTitleCn");
+  const descInput = document.getElementById("listingDescCn");
+  const kwInput = document.getElementById("listingKeywordsJp");
+
+  if (titleInput) {
+    titleInput.value = item.title_cn || "";
+  }
+  if (descInput) {
+    descInput.value = "";
+  }
+  if (kwInput) {
+    kwInput.value = (cat.jp_category || "")
+      .replace("Amazon｜", "")
+      .replace(/[（）\(\)]/g, " ");
+  }
+
+  // ★ 滚动到文案生成区
+  const section = document.getElementById("listingSection");
+  if (section && section.scrollIntoView) {
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 };
 
 
     // STEP2: 利益シミュレーション
+
+    
     document.getElementById("profitForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const resultEl = document.getElementById("profitResult");

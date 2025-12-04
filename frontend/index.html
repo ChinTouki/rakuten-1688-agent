@@ -565,22 +565,118 @@ if (marketFormPC) {
 
       statusEl.textContent = "選品完了";
 
-      const suggestions = data.suggestions || data.results || [];
-      if (!suggestions.length) {
-        resultEl.textContent =
-          "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
-        return;
-      }
+    const suggestions = data.suggestions || data.results || [];
+if (!suggestions.length) {
+  resultEl.textContent =
+    "該当するカテゴリがありませんでした。条件を緩めて再度お試しください。";
+  return;
+}
 
-      // ★ 这里存一下，后面的 useForProfit / useForListing 会用到
-      window.lastAutoSelectResults = suggestions;
+// ★ 保存选品结果，给 STEP2/3 的按钮用
+window.lastAutoSelectResults = suggestions;
 
-      // 暂时直接展示 JSON
-      resultEl.innerHTML = `
-        <div class="text-xs text-slate-800 whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded-md p-2">
-${JSON.stringify(suggestions, null, 2)}
+// ★ 把结果渲染成「类目卡片 + SKU 列表」
+let html = "";
+
+suggestions.forEach((cat, ci) => {
+  const jpCat = cat.jp_category || "";
+  const scene = cat.scene || "";
+  const trend = cat.trend_reason || "";
+  const kw1688 = cat.category_keyword_1688 || "";
+  const risk = cat.risk_level || "low";
+  const riskNotes = cat.risk_notes || "";
+  const items = cat.items || [];
+
+  html += `
+    <div class="mb-4 rounded-lg border border-slate-300 bg-white shadow-sm">
+      <div class="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <div class="text-xs font-semibold text-slate-900">${jpCat}</div>
+          <div class="text-[11px] text-slate-600">${scene}</div>
         </div>
-      `;
+        <div class="flex flex-col items-end gap-1">
+          <span class="inline-flex items-center rounded-full border px-2 py-[1px] text-[10px]
+                       ${risk === "low" ? "border-emerald-400 text-emerald-600" :
+                         risk === "mid" ? "border-amber-400 text-amber-600" :
+                                          "border-red-400 text-red-600"}">
+            リスク: ${risk}
+          </span>
+          ${kw1688
+            ? `<span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-[1px] text-[10px] text-slate-700">
+                 1688 検索キーワード: ${kw1688}
+               </span>`
+            : ""
+          }
+        </div>
+      </div>
+
+      <div class="px-3 py-2 border-b border-slate-200">
+        <div class="text-[11px] text-slate-600 whitespace-pre-line">
+          ${trend}
+        </div>
+        ${riskNotes
+          ? `<div class="mt-1 text-[11px] text-slate-500">注意点: ${riskNotes}</div>`
+          : ""
+        }
+      </div>
+
+      <div class="px-3 py-2">
+        ${
+          !items.length
+            ? `<div class="text-[11px] text-slate-500">このカテゴリでは条件に合う候補商品が見つかりませんでした。</div>`
+            : `
+              <table class="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50">
+                    <th class="px-1 py-1 text-left font-medium text-slate-600">#</th>
+                    <th class="px-1 py-1 text-left font-medium text-slate-600">商品タイトル（中国語）</th>
+                    <th class="px-1 py-1 text-right font-medium text-slate-600">仕入価格 (CNY)</th>
+                    <th class="px-1 py-1 text-right font-medium text-slate-600">スコア</th>
+                    <th class="px-1 py-1 text-center font-medium text-slate-600">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${items
+                    .map((item, ii) => {
+                      const t = item.title_cn || "";
+                      const price = item.price_cny ?? "";
+                      const score = item.score ?? "";
+                      return `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                          <td class="px-1 py-1 align-top text-slate-500">${ii + 1}</td>
+                          <td class="px-1 py-1 align-top text-slate-800">${t}</td>
+                          <td class="px-1 py-1 align-top text-right text-slate-800">${price}</td>
+                          <td class="px-1 py-1 align-top text-right text-slate-800">${score}</td>
+                          <td class="px-1 py-1 align-top">
+                            <div class="flex flex-col gap-1 items-stretch">
+                              <button type="button"
+                                class="w-full rounded bg-emerald-500 text-[10px] font-semibold text-white py-[3px]"
+                                onclick="useForProfit(${ci}, ${ii})">
+                                利益試算へ
+                              </button>
+                              <button type="button"
+                                class="w-full rounded bg-indigo-500 text-[10px] font-semibold text-white py-[3px]"
+                                onclick="useForListing(${ci}, ${ii})">
+                                文案作成へ
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    })
+                    .join("")
+                  }
+                </tbody>
+              </table>
+            `
+        }
+      </div>
+    </div>
+  `;
+});
+
+resultEl.innerHTML = html;
+
     } catch (err) {
       console.error(err);
       statusEl.textContent = "自動選品に失敗しました：" + err;

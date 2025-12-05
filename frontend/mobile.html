@@ -24,7 +24,7 @@
     </a>
   </header>
 
-  <!-- ステップ表示 -->
+  <!-- ステップナビ -->
   <nav class="px-4 py-2 bg-slate-900 border-b border-slate-800">
     <div class="flex items-center justify-between text-[11px]">
       <button
@@ -55,33 +55,6 @@
   <main class="pb-20">
     <!-- STEP1: 自動選品 -->
     <section id="step1" class="px-4 py-3 space-y-3">
-         <!-- STEP1.5: 1688 URL インポート -->
-    <section id="step1_5" class="px-4 py-3 space-y-2">
-      <h2 class="text-sm font-semibold">STEP1.5：1688 商品URLインポート（半自動）</h2>
-      <p class="text-xs text-slate-400">
-        1688 で目視選定した商品のURLを貼り付けて、タイトルと仕入れ単価を取得します。
-        ブロックされた場合はブラウザで開き、人力コピーしてください。
-      </p>
-
-      <form id="aliUrlFormMobile" class="flex flex-col gap-2">
-        <input
-          id="aliUrlInputMobile"
-          type="url"
-          class="w-full rounded-lg px-3 py-2 text-sm bg-slate-900 border border-slate-700"
-          placeholder="https://detail.1688.com/offer/....html"
-        />
-        <button
-          type="submit"
-          class="w-full py-2 rounded-lg bg-emerald-500 text-sm font-semibold text-slate-950"
-        >
-          1688 商品情報を取得
-        </button>
-      </form>
-
-      <div id="aliUrlResultMobile" class="text-xs text-slate-400"></div>
-    </section>
-
-
       <h2 class="text-sm font-semibold mb-1">STEP1：自動選品</h2>
       <p class="text-xs text-slate-400 mb-2">
         楽天＋Amazonトレンドからカテゴリを選び、1688 から候補商品を取得します。
@@ -101,24 +74,21 @@
             <option value="high">高単価（8,000円〜）</option>
           </select>
         </div>
-       <div>
-       <label class="block text-xs font-medium text-slate-300 mb-1">
-       避けたいジャンルキーワード（日文・カンマ区切り）
-       </label>
-     <input
-  　　　　id="avoidKeywordsInputMobile"
- 　　　　 type="text"
- 　　　　　 class="w-full rounded-md border border-slate-600 bg-white px-2 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-  　　　　　placeholder="避けたいジャンル"
-　　　　　/>
 
-      <p class="mt-1 text-[10px] text-slate-400">
-       例：ベビー、食品
-       </p>
-       </div>
-
-
-
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            避けたいジャンルキーワード（日文・カンマ区切り）
+          </label>
+          <input
+            id="avoidKeywordsInputMobile"
+            type="text"
+            class="w-full rounded-md border border-slate-600 bg-white px-2 py-1 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            placeholder="避けたいジャンル"
+          />
+          <p class="mt-1 text-[10px] text-slate-400">
+            例：ベビー、食品
+          </p>
+        </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
@@ -166,37 +136,35 @@
         </button>
       </form>
 
-      <div id="autoSelectStatusMobile" class="text-[11px] text-slate-400 mt-1"></div>
-
+      <p id="autoSelectStatusMobile" class="text-[11px] text-slate-400 mt-1"></p>
       <div id="autoSelectResultsMobile" class="space-y-3 mt-2 text-xs"></div>
+
+      <!-- STEP1.5: 1688 URL インポート（このブロックはSTEP1の中に1回だけ） -->
+      <section id="step1_5" class="mt-4 space-y-2">
+        <h2 class="text-sm font-semibold">STEP1.5：1688 商品URLインポート（半自動）</h2>
+        <p class="text-xs text-slate-400">
+          1688 で目視選定した商品のURLを貼り付けて、タイトルと仕入れ単価を取得します。
+          ブロックされた場合はブラウザで開き、人力コピーしてください。
+        </p>
+
+        <form id="aliUrlFormMobile" class="flex flex-col gap-2">
+          <input
+            id="aliUrlInputMobile"
+            type="url"
+            class="w-full rounded-lg px-3 py-2 text-sm bg-slate-900 border border-slate-700"
+            placeholder="https://detail.1688.com/offer/....html"
+          />
+          <button
+            type="submit"
+            class="w-full py-2 rounded-lg bg-emerald-500 text-sm font-semibold text-slate-950"
+          >
+            1688 商品情報を取得
+          </button>
+        </form>
+
+        <div id="aliUrlResultMobile" class="text-xs text-slate-400"></div>
+      </section>
     </section>
-
-        <!-- STEP1.5: 1688 URL インポート -->
-    <section id="step1_5" class="px-4 py-3 space-y-2">
-      <h2 class="text-sm font-semibold">STEP1.5：1688 商品URLインポート（半自動）</h2>
-      <p class="text-xs text-slate-400">
-        1688 で目視選定した商品のURLを貼り付けて、タイトルと仕入れ単価を取得します。
-        ブロックされた場合はブラウザで開き、人力コピーしてください。
-      </p>
-
-      <form id="aliUrlFormMobile" class="flex flex-col gap-2">
-        <input
-          id="aliUrlInputMobile"
-          type="url"
-          class="w-full rounded-lg px-3 py-2 text-sm bg-slate-900 border border-slate-700"
-          placeholder="https://detail.1688.com/offer/....html"
-        />
-        <button
-          type="submit"
-          class="w-full py-2 rounded-lg bg-emerald-500 text-sm font-semibold text-slate-950"
-        >
-          1688 商品情報を取得
-        </button>
-      </form>
-
-      <div id="aliUrlResultMobile" class="text-xs text-slate-400"></div>
-    </section>
-
 
     <!-- STEP2: 利益シミュレーション -->
     <section id="step2" class="px-4 py-3 hidden space-y-3">
@@ -390,47 +358,44 @@
     </section>
   </main>
 
-  <!-- （シンプルな固定フッターは、今回はナビゲーションボタンで代用） -->
-
   <script>
+    // ====== 共通：Token & secureFetch ======
     const TOKEN_STORAGE_KEY = "rakuten_agent_token_v1";
-  let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+    let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
 
-  async function ensureToken() {
-    if (!agentToken) {
-      const input = window.prompt("運営エージェント用パスワードを入力してください：");
-      if (!input) {
-        throw new Error("パスワードが入力されていません。");
+    async function ensureToken() {
+      if (!agentToken) {
+        const input = window.prompt("運営エージェント用パスワードを入力してください：");
+        if (!input) {
+          throw new Error("パスワードが入力されていません。");
+        }
+        agentToken = input.trim();
+        localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
       }
-      agentToken = input.trim();
-      localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
-    }
-  }
-
-  async function secureFetch(url, options = {}) {
-    await ensureToken();
-
-    const headers = options.headers || {};
-    // 如果没显式指定 Content-Type，默认加上
-    if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
-      headers["Content-Type"] = "application/json";
-    }
-    headers["X-Agent-Token"] = agentToken;
-
-    const resp = await fetch(url, { ...options, headers });
-
-    if (resp.status === 401) {
-      // 密码错了，清空并提示重输
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      agentToken = "";
-      alert("パスワードが間違っています。もう一度お試しください。");
-      throw new Error("Unauthorized");
     }
 
-    return resp;
-  }
+    async function secureFetch(url, options = {}) {
+      await ensureToken();
 
-    // --- PWA: Service Worker 登録（インデックスと同じ） ---
+      const headers = options.headers || {};
+      if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+      }
+      headers["X-Agent-Token"] = agentToken;
+
+      const resp = await fetch(url, { ...options, headers });
+
+      if (resp.status === 401) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        agentToken = "";
+        alert("パスワードが間違っています。もう一度お試しください。");
+        throw new Error("Unauthorized");
+      }
+
+      return resp;
+    }
+
+    // ====== PWA: Service Worker ======
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker
@@ -444,7 +409,7 @@
       });
     }
 
-    // ステップ切り替え
+    // ====== ステップ切り替え ======
     function showStep(step) {
       const s1 = document.getElementById("step1");
       const s2 = document.getElementById("step2");
@@ -477,7 +442,7 @@
       }
     }
 
-    // STEP1: 自動選品
+    // ====== STEP1: 自動選品 ======
     window.lastAutoSelectResultsMobile = [];
 
     document.getElementById("autoSelectFormMobile").addEventListener("submit", async (e) => {
@@ -488,9 +453,10 @@
       resultEl.innerHTML = "";
 
       const budget = document.getElementById("budgetLevelMobile").value;
-      const avoidRaw = document.getElementById("avoidKeywordsMobile").value || "";
+      const avoidInput = document.getElementById("avoidKeywordsInputMobile");
+      const avoidRaw = (avoidInput && avoidInput.value) || "";
       const avoidKeywords = avoidRaw
-        .split(",")
+        .split(/[,，、\s]+/)
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
@@ -508,12 +474,10 @@
       };
 
       try {
-       const resp = await secureFetch("/market_auto_select", {
-       method: "POST",
-       body: JSON.stringify(payload),
-       });
-
-
+        const resp = await secureFetch("/market_auto_select", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
 
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
@@ -621,7 +585,7 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // STEP2: 利益シミュレーション
+    // ====== STEP2: 利益シミュレーション ======
     document.getElementById("profitFormMobile").addEventListener("submit", async (e) => {
       e.preventDefault();
       const resultEl = document.getElementById("profitResultMobile");
@@ -653,8 +617,8 @@
 
       try {
         const resp = await secureFetch("/rakuten_profit_simulate", {
-        method: "POST",
-        body: JSON.stringify(payload),
+          method: "POST",
+          body: JSON.stringify(payload),
         });
 
         if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -690,7 +654,7 @@
       }
     });
 
-    // STEP3: 文案生成
+    // ====== STEP3: 文案生成 ======
     document.getElementById("listingFormMobile").addEventListener("submit", async (e) => {
       e.preventDefault();
       const resultEl = document.getElementById("listingResultMobile");
@@ -715,8 +679,8 @@
 
       try {
         const resp = await secureFetch("/rakuten_listing_copy", {
-        method: "POST",
-        body: JSON.stringify(payload),
+          method: "POST",
+          body: JSON.stringify(payload),
         });
 
         if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -764,97 +728,93 @@
       }
     });
 
-    // 初期表示
-    showStep(1);
+    // ====== 1688 URL インポート（モバイル用） ======
+    let lastParsed1688ItemMobile = null;
 
+    const aliUrlFormMobile = document.getElementById("aliUrlFormMobile");
+    if (aliUrlFormMobile) {
+      aliUrlFormMobile.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const urlInput = document.getElementById("aliUrlInputMobile");
+        const url = (urlInput.value || "").trim();
+        const resultEl = document.getElementById("aliUrlResultMobile");
 
-    // ===== 1688 URL インポート（モバイル用） =====
-  let lastParsed1688ItemMobile = null;
-
-  const aliUrlFormMobile = document.getElementById("aliUrlFormMobile");
-  if (aliUrlFormMobile) {
-    aliUrlFormMobile.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const urlInput = document.getElementById("aliUrlInputMobile");
-      const url = (urlInput.value || "").trim();
-      const resultEl = document.getElementById("aliUrlResultMobile");
-
-      if (!url) {
-        resultEl.textContent = "1688 の商品URLを入力してください。";
-        resultEl.className = "text-xs text-red-400";
-        return;
-      }
-
-      resultEl.textContent = "解析中...";
-      resultEl.className = "text-xs text-slate-400";
-
-      try {
-        const resp = await secureFetch("/ali1688/parse_url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
-
-        if (!resp.ok) {
-          const errJson = await resp.json().catch(() => null);
-          const msg = errJson?.detail || ("HTTP " + resp.status);
-          throw new Error(msg);
+        if (!url) {
+          resultEl.textContent = "1688 の商品URLを入力してください。";
+          resultEl.className = "text-xs text-red-400";
+          return;
         }
 
-        const data = await resp.json();
-        lastParsed1688ItemMobile = data;
+        resultEl.textContent = "解析中...";
+        resultEl.className = "text-xs text-slate-400";
 
-        resultEl.innerHTML = `
-          <div class="border border-emerald-500/40 rounded-lg p-2 space-y-1">
-            <div class="font-semibold text-xs text-slate-50 mb-1">解析結果</div>
-            <div class="text-xs"><span class="font-medium">タイトル（CN）：</span>${data.title_cn || "(取得できませんでした)"}</div>
-            <div class="text-xs"><span class="font-medium">価格（CNY）：</span>${data.price_cny ?? "(不明)"}</div>
-            <div class="flex gap-2 mt-1">
-              <button type="button"
-                class="flex-1 py-1 rounded bg-emerald-500 text-[11px] font-semibold text-slate-950"
-                onclick="applyParsed1688ToProfitMobile()">
-                利益試算に反映
-              </button>
-              <button type="button"
-                class="flex-1 py-1 rounded bg-indigo-500 text-[11px] font-semibold text-slate-50"
-                onclick="applyParsed1688ToListingMobile()">
-                文案に反映
-              </button>
+        try {
+          const resp = await secureFetch("/ali1688/parse_url", {
+            method: "POST",
+            body: JSON.stringify({ url }),
+          });
+
+          if (!resp.ok) {
+            const errJson = await resp.json().catch(() => null);
+            const msg = errJson?.detail || ("HTTP " + resp.status);
+            throw new Error(msg);
+          }
+
+          const data = await resp.json();
+          lastParsed1688ItemMobile = data;
+
+          resultEl.innerHTML = `
+            <div class="border border-emerald-500/40 rounded-lg p-2 space-y-1">
+              <div class="font-semibold text-xs text-slate-50 mb-1">解析結果</div>
+              <div class="text-xs"><span class="font-medium">タイトル（CN）：</span>${data.title_cn || "(取得できませんでした)"}</div>
+              <div class="text-xs"><span class="font-medium">価格（CNY）：</span>${data.price_cny ?? "(不明)"}</div>
+              <div class="flex gap-2 mt-1">
+                <button type="button"
+                  class="flex-1 py-1 rounded bg-emerald-500 text-[11px] font-semibold text-slate-950"
+                  onclick="applyParsed1688ToProfitMobile()">
+                  利益試算に反映
+                </button>
+                <button type="button"
+                  class="flex-1 py-1 rounded bg-indigo-500 text-[11px] font-semibold text-slate-50"
+                  onclick="applyParsed1688ToListingMobile()">
+                  文案に反映
+                </button>
+              </div>
             </div>
-          </div>
-        `;
-      } catch (err) {
-        console.error(err);
-        resultEl.textContent = "解析に失敗しました：" + err;
-        resultEl.className = "text-xs text-red-400";
+          `;
+        } catch (err) {
+          console.error(err);
+          resultEl.textContent = "解析に失敗しました：" + err;
+          resultEl.className = "text-xs text-red-400";
+        }
+      });
+    }
+
+    window.applyParsed1688ToProfitMobile = function () {
+      if (!lastParsed1688ItemMobile) return;
+      const it = lastParsed1688ItemMobile;
+      const titleInput = document.getElementById("profitTitleCnMobile");
+      const costInput = document.getElementById("costCnyMobile");
+
+      if (titleInput && it.title_cn) {
+        titleInput.value = it.title_cn;
       }
-    });
-  }
+      if (costInput && typeof it.price_cny === "number") {
+        costInput.value = it.price_cny;
+      }
+    };
 
-  window.applyParsed1688ToProfitMobile = function () {
-    if (!lastParsed1688ItemMobile) return;
-    const it = lastParsed1688ItemMobile;
-    const titleInput = document.getElementById("profitTitleCnMobile");
-    const costInput = document.getElementById("costCnyMobile");
+    window.applyParsed1688ToListingMobile = function () {
+      if (!lastParsed1688ItemMobile) return;
+      const it = lastParsed1688ItemMobile;
+      const titleInput = document.getElementById("listingTitleCnMobile");
+      if (titleInput && it.title_cn) {
+        titleInput.value = it.title_cn;
+      }
+    };
 
-    if (titleInput && it.title_cn) {
-      titleInput.value = it.title_cn;
-    }
-    if (costInput && typeof it.price_cny === "number") {
-      costInput.value = it.price_cny;
-    }
-  };
-
-  window.applyParsed1688ToListingMobile = function () {
-    if (!lastParsed1688ItemMobile) return;
-    const it = lastParsed1688ItemMobile;
-    const titleInput = document.getElementById("listingTitleCnMobile");
-    if (titleInput && it.title_cn) {
-      titleInput.value = it.title_cn;
-    }
-  };
-
-
+    // 初期表示
+    showStep(1);
   </script>
 </body>
 </html>

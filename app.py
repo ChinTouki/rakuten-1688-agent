@@ -2,6 +2,7 @@ import os
 import csv
 import json
 import logging
+logger = logging.getLogger("uvicorn.error") 
 from io import StringIO
 from typing import List, Optional
 
@@ -24,10 +25,22 @@ from core.schemas import Ali1688UrlParseRequest, Ali1688ParsedItem
 
 from tools.ali1688_url_parser import parse_1688_url, Ali1688UrlParseError
 from tools.ali1688_stub import search_ali1688_by_cn_keyword
-from tools.rakuten_stub import get_jp_trending_categories
+from tools.ali1688_url_parser import parse_1688_url, Ali1688UrlParseError
+
 
 # 读取 .env
 load_dotenv()
+
+# ========= OpenAI & 访问密码 =========
+
+# 从环境变量读取 OpenAI Key（你已经在 .env 里配了 OPENAI_API_KEY）
+openai.api_key = os.getenv("OPENAI_API_KEY", "")
+logger.info("OPENAI_API_KEY length at startup: %d", len(openai.api_key or ""))
+
+# 从环境变量读取访问密码（token），前端用 X-Agent-Token 传
+AGENT_ACCESS_TOKEN = os.getenv("AGENT_ACCESS_TOKEN", "").strip()
+logger.info("AGENT_ACCESS_TOKEN length at startup: %d", len(AGENT_ACCESS_TOKEN))
+
 
 # ========= FastAPI 实例 & 静态文件 =========
 
@@ -46,6 +59,7 @@ app.add_middleware(
 app.mount("/ui", StaticFiles(directory="frontend", html=True), name="ui")
 
 
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     """
@@ -58,19 +72,13 @@ async def favicon():
     return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
 
-# ========= OpenAI & 访问密码 =========
 
-# 从环境变量读取 OpenAI Key（你已经在 .env 里配了 OPENAI_API_KEY）
-openai.api_key = os.getenv("OPENAI_API_KEY", "")
-
-# 从环境变量读取访问密码（token），前端用 X-Agent-Token 传
-AGENT_ACCESS_TOKEN = os.getenv("AGENT_ACCESS_TOKEN", "").strip()
 
 
 def verify_token(
     x_agent_token: Optional[str] = Header(
         default=None,
-        alias="X-Agent-Token",  # 确保用的是这个请求头名
+        alias="X-Agent-Token",
     )
 ):
     """
@@ -80,25 +88,35 @@ def verify_token(
     """
     if not AGENT_ACCESS_TOKEN:
         # 没配置就相当于不启用保护
+        logger.warning("AGENT_ACCESS_TOKEN is empty; skip auth check")
         return
 
+    # 打印一下收到的 header 和 env 的长度（不会把密码内容输出，只输出 repr 和长度）
+    logger.info(
+        "verify_token: header=%r (len=%d), env_len=%d",
+        x_agent_token,
+        len(x_agent_token or ""),
+        len(AGENT_ACCESS_TOKEN),
+    )
+
     if x_agent_token != AGENT_ACCESS_TOKEN:
+        logger.warning("verify_token: token mismatch")
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-# ========= 选品相关的请求模型（本文件内定义） =========
+    logger.info("verify_token: token OK")
 
-class MarketSuggestRequest(BaseModel):
+
+
+@app.get("/auth/check", dependencies=[Depends(verify_token)])
+def auth_check():
     """
-    日本市场类目推荐用的请求体：
-    - budget_level: 预算强度（影响客单价带）
-    - avoid_keywords: 想要避开的类目关键字（例如 ["ベビー", "食品"]）
-    - top_k: 推荐几个大类目
-    - market_sources: 使用哪些市场数据源（"rakuten", "amazon" 等）
+    用于前端在密码弹窗中即时验证 token 是否正确。
+    - 正确：返回 {"ok": True}
+    - 错误：verify_token 会直接抛 401，前端会显示“パスワードが正しくありません。”
     """
-    budget_level: str = "low"           # "low" / "mid" / "high"
-    avoid_keywords: List[str] = []
-    top_k: int = 5
-    market_sources: Optional[List[str]] = None
+    return {"ok": True}
+
+
 
 
 class MarketAutoSelectRequest(BaseModel):
@@ -117,52 +135,6 @@ class MarketAutoSelectRequest(BaseModel):
     min_price_cny: float = 5.0
     max_price_cny: float = 40.0
 
-
-class SelectionRequest(BaseModel):
-    """
-    传给 score_product 用的简单配置：
-    - directions: 方向关键词列表（例如类目或搜索词）
-    - min_price_cny / max_price_cny: 价格区间
-    """
-    directions: List[str]
-    min_price_cny: float
-    max_price_cny: float
-
-# ========= 简单打分逻辑（本文件内的临时版本） =========
-
-def score_product(p: dict, sel_req: SelectionRequest) -> float:
-    """
-    给 1688 商品打一个 0~1 的简单分数，用于排序。
-    当前版本非常简单：
-      - 价格在区间内：基础分 0.6
-      - 标题里包含 direction 关键词：每命中一个 +0.2（最多 +0.4）
-    以后你可以随时改成更复杂的规则。
-    """
-    # 价格基础分
-    price = float(p.get("price_cny", 0.0))
-    base = 0.0
-    if sel_req.min_price_cny <= price <= sel_req.max_price_cny:
-        base = 0.6
-
-    # 标题匹配分
-    title = (p.get("title_cn") or p.get("title") or "").lower()
-    match_score = 0.0
-    for kw in sel_req.directions:
-        if not kw:
-            continue
-        if str(kw).lower() in title:
-            match_score += 0.2
-    # 上限 0.4
-    if match_score > 0.4:
-        match_score = 0.4
-
-    score = base + match_score
-    # 限制在 [0, 1]
-    if score < 0.0:
-        score = 0.0
-    if score > 1.0:
-        score = 1.0
-    return score
 
 
 
@@ -193,17 +165,6 @@ class MarketSuggestRequest(BaseModel):
     top_k: int = 5
     market_sources: List[str] = ["rakuten"]  # 新增: ["rakuten"], ["amazon"], ["rakuten","amazon"]
 
-
-class MarketAutoSelectRequest(BaseModel):
-    # 市场侧条件
-    budget_level: str = "low"           # "low" / "mid" / "high"
-    avoid_keywords: List[str] = []      # 想避开的类目关键词（如 ["ベビー", "食品"]）
-    top_k_categories: int = 3           # 一次选几个热门类目
-
-    # 1688 侧选品条件
-    max_items_per_category: int = 30    # 每个类目最多抓多少个候选
-    min_price_cny: float = 5.0          # 进货价下限
-    max_price_cny: float = 40.0         # 进货价上限
 
 class ProfitSimItem(BaseModel):
     product_id: str
@@ -385,7 +346,7 @@ def _fetch_rakuten_weekly_item_names(limit: int = 80) -> list[str]:
     resp.raise_for_status()
 
     soup = BeautifulSoup(resp.text, "html.parser")
-    names: list[str] = []
+    names: List[str] = []
 
     for a in soup.find_all("a", href=True):
         href = a["href"]
@@ -464,6 +425,32 @@ CATEGORY_RULES = [
     # 生鮮・冷凍系はルールに入れない（あなたの条件：冷蔵・冷凍なし）
 ]
 
+def _classify_items_to_categories(item_names: list[str]) -> list[dict]:
+    """
+    根据 CATEGORY_RULES，把楽天商品タイトル归类成若干大类，并给每个大类一个 score（命中次数）。
+    返回的每个 dict 至少包含:
+      - jp_category
+      - scene
+      - suggested_1688_keywords
+      - budget_band
+      - suitable_for_1688
+      - risk_level
+      - risk_notes
+      - score
+    """
+    bucket: dict[str, dict] = {}
+
+    for name in item_names:
+        for rule in CATEGORY_RULES:
+            if any(trigger in name for trigger in rule["triggers"]):
+                key = rule["jp_category"]
+                if key not in bucket:
+                    # 拷贝一份 rule，附带 score
+                    bucket[key] = {**rule, "score": 0}
+                bucket[key]["score"] += 1
+
+    # 按 score 从高到低排序
+    return sorted(bucket.values(), key=lambda x: x["score"], reverse=True)
 
 
 
@@ -904,47 +891,57 @@ def read_root():
 
 @app.post("/select")
 def select_products(req: SelectionRequest):
+    """
+    从本地 CSV / 假数据中选品：
+      - 用 score_product 做基础打分
+      - 用 estimate_price_and_margin 估算建议售价和毛利率
+      - 选用 LLM 做精细评估（失败则回退到规则打分）
+    """
     products = load_products_from_csv()
-    scored = []
+    results = []
+
     for p in products:
-        s = score_product(p, req)
-        scored.append(
-            {
-                "id": p["id"],
-                "title_cn": p["title_cn"],
-                "price_cny": p["price_cny"],
-                "score": round(s, 3),
-            }
-        )
+        price_cny = float(p.get("price_cny", 0.0))
 
+        # 1) 规则打分（base_score）
+        base_score = score_product(p, req)
 
-        # 2) 默认值（万一 LLM 失败就用这些）
-        japan_fit_score = base_score
+        # 2) 利润模型：建议售价 + 毛利率
+        suggested_price_jpy, margin_rate = estimate_price_and_margin(price_cny, req)
+
+        # 3) 默认档位和卖点（LLM 失败时用）
         grade = grade_from_score(base_score, margin_rate)
         jp_bullets = build_jp_bullets(p, req.directions)
-        risk_notes = []
+        risk_notes: list[str] = []
 
-        # 3) 尝试调用 LLM 精细评估
+        # 4) 尝试调用 LLM 做更细的评估（可选）
+        japan_fit_score = base_score  # 默认用规则分
         try:
-            llm_res = llm_evaluate_product(p, req, suggested_price_jpy, margin_rate)
+            llm_res = llm_evaluate_product(
+                prod=p,
+                suggested_price_jpy=suggested_price_jpy,
+                margin_rate=margin_rate,
+                directions=req.directions,
+            )
             if isinstance(llm_res, dict):
                 if "japan_fit_score" in llm_res:
                     japan_fit_score = float(llm_res["japan_fit_score"])
                 if "grade" in llm_res:
                     grade = llm_res["grade"]
-                if "jp_bullets" in llm_res and llm_res["jp_bullets"]:
+                if llm_res.get("jp_bullets"):
                     jp_bullets = llm_res["jp_bullets"]
-                if "risk_notes" in llm_res and llm_res["risk_notes"]:
+                if llm_res.get("risk_notes"):
                     risk_notes = llm_res["risk_notes"]
         except Exception as e:
-            # 解析失败或 API 出错时，只记录一条提示
-            risk_notes.append(f"LLM評価に失敗したため、ルールベースで算出しました。error={e}")
+            risk_notes.append(
+                f"LLM評価に失敗したため、ルールベースで算出しました。error={e}"
+            )
 
-        scored.append(
+        results.append(
             {
-                "id": p["id"],
-                "title_cn": p["title_cn"],
-                "price_cny": p["price_cny"],
+                "id": p.get("id", ""),
+                "title_cn": p.get("title_cn", ""),
+                "price_cny": price_cny,
                 "score": round(japan_fit_score, 3),
                 "suggested_price_jpy": suggested_price_jpy,
                 "margin_rate": margin_rate,
@@ -954,12 +951,14 @@ def select_products(req: SelectionRequest):
             }
         )
 
-    scored.sort(key=lambda x: x["score"], reverse=True)
+    # 按最终得分降序
+    results.sort(key=lambda x: x["score"], reverse=True)
 
     return {
         "directions": req.directions,
-        "results": scored,
+        "results": results,
     }
+
 
 @app.post("/select_csv", response_class=PlainTextResponse)
 def select_products_csv(req: SelectionRequest):
@@ -996,7 +995,7 @@ def select_products_csv(req: SelectionRequest):
             item.get("margin_rate", ""),
         ])
 
-    csv_text = output.getvalue()
+    csv_text = '\ufeff' + output.getvalue()
     return csv_text
 
 @app.post("/auto_select")
@@ -1043,8 +1042,13 @@ def auto_select(req: AutoSelectRequest):
         "results": scored,
     }
 
-@app.post("/ali1688/parse_url", response_model=Ali1688ParsedItem)
+@app.post(
+    "/ali1688/parse_url",
+    response_model=Ali1688ParsedItem,
+    dependencies=[Depends(verify_token)],
+)
 def ali1688_parse_url(req: Ali1688UrlParseRequest):
+
     """
     贴 1688 商品 URL，自动抓取商品标题 / 价格 / 图片。
     """
@@ -1178,8 +1182,13 @@ def market_auto_select(req: MarketAutoSelectRequest):
         "results": results,
     }
 
-@app.post("/market_auto_select_csv", response_class=PlainTextResponse)
+@app.post(
+    "/market_auto_select_csv",
+    response_class=PlainTextResponse,
+    dependencies=[Depends(verify_token)],
+)
 def market_auto_select_csv(req: MarketAutoSelectRequest):
+
     """
     /market_auto_select 的 CSV 版：
     - 按日本市场趋势选类目
@@ -1222,7 +1231,7 @@ def market_auto_select_csv(req: MarketAutoSelectRequest):
                 item.get("score", ""),
             ])
 
-    csv_text = output.getvalue()
+    csv_text = '\ufeff' + output.getvalue()
     return csv_text
 
 @app.post("/rakuten_profit_simulate", dependencies=[Depends(verify_token)])
@@ -1357,8 +1366,6 @@ def rakuten_listing_copy(req: ListingCopyRequest):
         }
 
 
-# 挂载前端界面，访问 /ui 就能打开网页
-app.mount("/ui", StaticFiles(directory="frontend", html=True), name="ui")
 
 
 

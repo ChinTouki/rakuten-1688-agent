@@ -139,7 +139,7 @@
       <p id="autoSelectStatusMobile" class="text-[11px] text-slate-400 mt-1"></p>
       <div id="autoSelectResultsMobile" class="space-y-3 mt-2 text-xs"></div>
 
-      <!-- STEP1.5: 1688 URL インポート（このブロックはSTEP1の中に1回だけ） -->
+      <!-- STEP1.5: 1688 URL インポート（STEP1内に1回だけ） -->
       <section id="step1_5" class="mt-4 space-y-2">
         <h2 class="text-sm font-semibold">STEP1.5：1688 商品URLインポート（半自動）</h2>
         <p class="text-xs text-slate-400">
@@ -686,6 +686,29 @@
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
 
+        // 新バックエンド構造: error オブジェクト優先
+        if (data.error) {
+          const errInfo = data.error;
+          const rawText = errInfo.raw_text || data.raw_text || "";
+          resultEl.innerHTML = `
+            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-3 space-y-2">
+              <div class="text-[11px] text-red-400">
+                ${errInfo.message_ja || "AI文案生成でエラーが発生しました。時間をおいて再度お試しください。"}
+              </div>
+              ${
+                rawText
+                  ? `<details class="mt-1">
+                       <summary class="text-[11px] text-slate-400 cursor-pointer">AIからの生テキストを表示</summary>
+                       <pre class="whitespace-pre-wrap text-[11px] mt-1">${rawText}</pre>
+                     </details>`
+                  : ""
+              }
+            </div>
+          `;
+          return;
+        }
+
+        // 互換: 旧構造（トップレベル raw_text）
         if (data.raw_text) {
           resultEl.innerHTML = `
             <div class="rounded-2xl border border-slate-800 bg-slate-900 p-3">
@@ -813,20 +836,17 @@
       }
     };
 
-    // 初期表示
+    // ===== 初期表示 & 初回パスワード確認 =====
     showStep(1);
-   
-    // ===== 初回アクセス時にパスワード確認（モバイル用） =====
-document.addEventListener("DOMContentLoaded", () => {
-  // 起動後すぐにトークン確認（未登録ならプロンプト表示）
-  ensureToken().catch((err) => {
-    console.warn("初回トークン確認エラー:", err);
-    // ユーザーがキャンセルした場合などは、そのまま放置して、
-    // 実際にボタン押下時にもう一度聞かれる。
-  });
-});
 
-
+    document.addEventListener("DOMContentLoaded", () => {
+      // 起動後すぐにトークン確認（未登録ならプロンプト表示）
+      ensureToken().catch((err) => {
+        console.warn("初回トークン確認エラー:", err);
+        // キャンセルされた場合などは、そのまま放置して、
+        // 実際にボタン押下時にもう一度聞かれる。
+      });
+    });
   </script>
 </body>
 </html>

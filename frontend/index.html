@@ -911,79 +911,114 @@ async function secureFetch(path, options = {}) {
       }
     });
 
-    // ===== STEP3: 楽天商品ページ文案生成 =====
-    document.getElementById("listingForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const resultEl = document.getElementById("listingResult");
-      resultEl.textContent = "生成中...";
+    // STEP3: 楽天商品ページ文案生成（PC）
+document.getElementById("listingForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const resultEl = document.getElementById("listingResult");
+  resultEl.textContent = "生成中...";
 
-      const titleCn = document.getElementById("listingTitleCn").value || "";
-      const descCn = document.getElementById("listingDescCn").value || "";
-      const kwRaw = document.getElementById("listingKeywordsJp").value || "";
-      const tone = document.getElementById("listingTone").value || "シンプル";
+  const titleCn = document.getElementById("listingTitleCn").value || "";
+  const descCn = document.getElementById("listingDescCn").value || "";
+  const kwRaw = document.getElementById("listingKeywordsJp").value || "";
+  const tone = document.getElementById("listingTone").value || "シンプル";
 
-      const keywordsJp = kwRaw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+  const keywordsJp = kwRaw
+    .split(/[,，、]/)  // 兼容 , ， 、 三种分隔
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 
-      const payload = {
-        title_cn: titleCn,
-        desc_cn: descCn,
-        keywords_jp: keywordsJp,
-        shop_tone: tone
-      };
+  const payload = {
+    title_cn: titleCn,
+    desc_cn: descCn,
+    keywords_jp: keywordsJp,
+    shop_tone: tone,
+  };
 
-      try {
-        const resp = await secureFetch("/rakuten_listing_copy", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+  try {
+    const resp = await secureFetch("/rakuten_listing_copy", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
 
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        const data = await resp.json();
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
 
-        if (data.raw_text) {
-          resultEl.innerHTML = `
-            <div class="border rounded-xl p-3 bg-slate-50">
-              <div class="text-xs text-red-500 mb-2">JSON 解析に失敗したため、生テキストを表示します。</div>
-              <pre class="whitespace-pre-wrap text-xs">${data.raw_text}</pre>
-            </div>
-          `;
-          return;
-        }
+    // ① 后端显式返回 error 字段（我们刚在 app.py 里加的那种）
+    if (data.error) {
+      const errInfo = data.error || {};
+      const msg =
+        errInfo.message_ja ||
+        "現在AI文案生成が一時的に利用しづらい状態です。時間をおいて再度お試しください。";
 
+      // JSON 解析失败 + 有 raw_text 的情况
+      if (errInfo.code === "OPENAI_JSON_ERROR" && errInfo.raw_text) {
         resultEl.innerHTML = `
-          <div class="border rounded-xl p-3 bg-slate-50 space-y-2">
-            <div>
-              <div class="text-xs font-semibold text-slate-600 mb-1">楽天用タイトル</div>
-              <div class="text-sm">${data.title_jp || ""}</div>
-            </div>
-            <div>
-              <div class="text-xs font-semibold text-slate-600 mb-1">箇条書き（売りポイント）</div>
-              <ul class="list-disc list-inside text-sm">
-                ${(data.bullets_jp || [])
-                  .map((b) => `<li>${b}</li>`)
-                  .join("")}
-              </ul>
-            </div>
-            <div>
-              <div class="text-xs font-semibold text-slate-600 mb-1">商品説明文</div>
-              <div class="text-sm whitespace-pre-wrap">${data.description_jp || ""}</div>
-            </div>
-            <div>
-              <div class="text-xs font-semibold text-slate-600 mb-1">検索キーワード候補</div>
-              <div class="text-xs">
-                ${(data.search_keywords_jp || []).join(" / ")}
-              </div>
+          <div class="border rounded-xl p-3 bg-slate-50">
+            <div class="text-xs text-red-500 mb-2">${msg}</div>
+            <pre class="whitespace-pre-wrap text-xs">${errInfo.raw_text}</pre>
+          </div>
+        `;
+      } else {
+        // OpenAI 调用失败（网络 / key / 限流等）
+        resultEl.innerHTML = `
+          <div class="border rounded-xl p-3 bg-slate-50">
+            <div class="text-xs text-red-500">${msg}</div>
+            <div class="mt-1 text-[10px] text-slate-400">
+              （しばらく時間をおいてから再度お試しください）
             </div>
           </div>
         `;
-      } catch (err) {
-        console.error(err);
-        resultEl.innerHTML = "<div class='text-xs text-red-500'>文案生成に失敗しました：" + err + "</div>";
       }
-    });
+      return;
+    }
+
+    // ② 兼容旧版后端：只有 raw_text，没有 error 的情况（防御性保留）
+    if (data.raw_text) {
+      resultEl.innerHTML = `
+        <div class="border rounded-xl p-3 bg-slate-50">
+          <div class="text-xs text-red-500 mb-2">
+            JSON 解析に失敗したため、生テキストを表示します。
+          </div>
+          <pre class="whitespace-pre-wrap text-xs">${data.raw_text}</pre>
+        </div>
+      `;
+      return;
+    }
+
+    // ③ 正常成功：展示标题 / 箇条書き / 説明 / キーワード
+    resultEl.innerHTML = `
+      <div class="border rounded-xl p-3 bg-slate-50 space-y-2">
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-1">楽天用タイトル</div>
+          <div class="text-sm">${data.title_jp || ""}</div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-1">箇条書き（売りポイント）</div>
+          <ul class="list-disc list-inside text-sm">
+            ${(data.bullets_jp || [])
+              .map((b) => `<li>${b}</li>`)
+              .join("")}
+          </ul>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-1">商品説明文</div>
+          <div class="text-sm whitespace-pre-wrap">${data.description_jp || ""}</div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-1">検索キーワード候補</div>
+          <div class="text-xs">
+            ${(data.search_keywords_jp || []).join(" / ")}
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    console.error(err);
+    resultEl.innerHTML =
+      "<div class='text-xs text-red-500'>文案生成に失敗しました：" + err + "</div>";
+  }
+});
+
 
     // ===== 1688 URL インポート（STEP2） =====
     let lastParsed1688Item = null;

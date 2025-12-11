@@ -815,6 +815,18 @@
 
     // 初期表示
     showStep(1);
+   
+    // ===== 初回アクセス時にパスワード確認（モバイル用） =====
+document.addEventListener("DOMContentLoaded", () => {
+  // 起動後すぐにトークン確認（未登録ならプロンプト表示）
+  ensureToken().catch((err) => {
+    console.warn("初回トークン確認エラー:", err);
+    // ユーザーがキャンセルした場合などは、そのまま放置して、
+    // 実際にボタン押下時にもう一度聞かれる。
+  });
+});
+
+
   </script>
 </body>
 </html>

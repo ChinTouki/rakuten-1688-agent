@@ -1290,7 +1290,7 @@ def rakuten_profit_simulate(req: ProfitSimRequest):
 def rakuten_listing_copy(req: ListingCopyRequest):
     """
     1688の中国語情報から、楽天向け日本語商品ページ文案を生成するエンドポイント。
-    エラーが起きても HTTP 500 にはせず、raw_text にメッセージを入れて 200 で返す。
+    エラーが起きても HTTP 500 にはせず、error フィールドにメッセージを入れて 200 で返す。
     """
     system_prompt = (
         "あなたは日本の楽天市場のプロの運営担当者です。"
@@ -1323,12 +1323,12 @@ def rakuten_listing_copy(req: ListingCopyRequest):
 - 箇条書きは 4〜6 個にしてください。
 - 説明文は 400〜800 文字を目安に、読みやすい段落にしてください。
 - 絶対に JSON 以外の文章は書かないでください。
-"""
+""".strip()
 
-    # 1) 先调用 OpenAI，如果失败，就用 raw_text 返回错误信息（HTTP 200）
+    # 1) 先调用 OpenAI，如果失败，就用 error 结构返回（HTTP 200）
     try:
         resp = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  # 如果这个模型不通，可以先换成 gpt-3.5-turbo 试试
+            model="gpt-4o-mini",  # 模型按你现在用的
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -1337,16 +1337,20 @@ def rakuten_listing_copy(req: ListingCopyRequest):
         )
         content = resp["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        # 不抛 HTTPException，避免前端看到 500
+        logger.error("OPENAI ChatCompletion error: %r", e)
         return {
             "title_jp": "",
             "bullets_jp": [],
             "description_jp": "",
             "search_keywords_jp": [],
-            "raw_text": f"OPENAI_ERROR: {e}",
+            "error": {
+                "code": "OPENAI_CALL_ERROR",
+                "message_ja": "現在AI文案生成が一時的に利用しづらい状態です。時間をおいて再度お試しください。",
+                "debug": str(e),
+            },
         }
 
-    # 2) 解析 JSON，如果失败，就把原始 content 走 raw_text 兜底
+    # 2) 解析 JSON，如果失败，用 error + raw_text 返回
     try:
         data = json.loads(content)
         return {
@@ -1355,19 +1359,17 @@ def rakuten_listing_copy(req: ListingCopyRequest):
             "description_jp": data.get("description_jp", ""),
             "search_keywords_jp": data.get("search_keywords_jp", []),
         }
-    except Exception:
-        # 这里前端会走 raw_text 分支，在页面显示原文
+    except Exception as e:
+        logger.warning("OPENAI JSON parse failed: %r; content=%r", e, content)
         return {
             "title_jp": "",
             "bullets_jp": [],
             "description_jp": "",
             "search_keywords_jp": [],
-            "raw_text": content,
+            "error": {
+                "code": "OPENAI_JSON_ERROR",
+                "message_ja": "AIからの応答をうまく解析できませんでした。テキストをそのまま表示します。",
+                "debug": str(e),
+                "raw_text": content,
+            },
         }
-
-
-
-
-
-
-

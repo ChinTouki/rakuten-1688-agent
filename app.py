@@ -1175,92 +1175,139 @@ def market_suggest(req: MarketSuggestRequest):
 @app.post("/market_auto_select", dependencies=[Depends(verify_token)])
 def market_auto_select(req: MarketAutoSelectRequest):
     """
-    楽天＋Amazonトレンド（ローカルJSON） + 1688候補商品一覧 から
-    パラメータに応じてカテゴリをスコアリングして返す。
+    日本市場トレンド（楽天＋Amazon stub）＋ 1688 検索 から
+    カテゴリ候補とその配下の SKU を自動で選定して返す。
+
+    ※ もう TREND_DATA の「3本固定データ」には依存しない。
     """
 
-    if not TREND_DATA:
+    # 1) 日本側の「今売れているカテゴリ」を取得
+    ms_req = MarketSuggestRequest(
+        budget_level=req.budget_level,
+        avoid_keywords=req.avoid_keywords,
+        top_k=req.top_k_categories,
+        market_sources=["rakuten", "amazon"],  # 楽天＋Amazon stub 両方使う
+    )
+    trend_cats = get_jp_trending_categories(ms_req)
+
+    # もし何らかの理由で 0 件になった場合だけ、最後の最後に TREND_DATA を使う（完全真空回避用）
+    if not trend_cats and TREND_DATA:
+        trend_cats = TREND_DATA
+
+    if not trend_cats:
         return {
             "results": [],
             "error": {
                 "code": "NO_TREND_DATA",
-                "message_ja": "トレンド候補データが読み込まれていません。管理者にお問い合わせください。"
+                "message_ja": "市場トレンド情報が取得できませんでした。しばらくしてから再度お試しください。"
             }
         }
 
-    # 1) 避けたいキーワードでカテゴリをフィルタ
-    avoid_lower = [kw.strip().lower() for kw in (req.avoid_keywords or []) if kw.strip()]
-    def is_avoided(cat: dict) -> bool:
-        text = (
-            (cat.get("jp_category") or "") + " " +
-            (cat.get("scene") or "") + " " +
-            " ".join(cat.get("keywords") or [])
-        ).lower()
-        return any(kw in text for kw in avoid_lower)
-
-    candidates = [c for c in TREND_DATA if not is_avoided(c)]
-
-    # 2) budget_level で平均価格帯フィルタ
-    def match_budget(cat: dict) -> bool:
-        price = cat.get("avg_price_jpy") or 3000
-        if req.budget_level == "low":
-            return price <= 3000
-        if req.budget_level == "mid":
-            return 2000 <= price <= 8000
-        if req.budget_level == "high":
-            return price >= 5000
-        return True  # 不明な場合は通す
-
-    candidates = [c for c in candidates if match_budget(c)]
-
-    # 3) 各カテゴリ内の 1688 商品を価格帯でフィルタ
+    # 2) 各カテゴリに対して 1688 から候補 SKU を取得
     min_cny = req.min_price_cny if req.min_price_cny is not None else 0.0
     max_cny = req.max_price_cny if req.max_price_cny is not None else 999999.0
-    max_items = req.max_items_per_category if req.max_items_per_category else 20
+    max_items = req.max_items_per_category or 20
 
-    scored_categories = []
-    for cat in candidates:
-        raw_items = cat.get("items") or []
-        filtered_items = []
-        for it in raw_items:
-            price = it.get("price_cny")
-            if price is None:
+    category_results: List[dict] = []
+
+    for cat in trend_cats:
+        # 2-1) 1688 用キーワードを決める
+        kw_list = (
+            cat.get("suggested_1688_keywords")
+            or cat.get("keywords")
+            or []
+        )
+        if kw_list:
+            kw = kw_list[0]
+        else:
+            # どうしてもなければ、日本語カテゴリ名をそのまま突っ込む
+            kw = cat.get("jp_category", "")
+
+        # 2-2) 1688 検索（stub or 本番 API）
+        try:
+            raw_items = search_ali1688_by_cn_keyword(kw, max_items)
+        except Exception as e:
+            logger.error("search_ali1688_by_cn_keyword failed for kw=%r: %r", kw, e)
+            raw_items = []
+
+        scored_items = []
+        for item in raw_items or []:
+            # price_cny をできるだけ柔軟に取得
+            raw_price = (
+                item.get("price_cny")
+                or item.get("price")
+                or item.get("min_price")
+                or item.get("min_price_cny")
+            )
+            try:
+                price = float(raw_price)
+            except Exception:
                 continue
+
             if not (min_cny <= price <= max_cny):
                 continue
-            filtered_items.append(it)
 
-        if not filtered_items:
-            # このカテゴリでは指定価格帯の1688商品がない
+            title = (
+                item.get("title_cn")
+                or item.get("subject")
+                or item.get("title")
+                or ""
+            )
+
+            # 既存の score_product を再利用して「日本向けのざっくりスコア」を付ける
+            sel_req = SelectionRequest(
+                directions=[kw],
+                min_price_cny=min_cny,
+                max_price_cny=max_cny,
+            )
+            try:
+                s = score_product(
+                    {"title_cn": title, "price_cny": price},
+                    sel_req,
+                )
+            except Exception:
+                s = 0.5  # 评分算不出来就给个中间值
+
+            scored_items.append(
+                {
+                    "id": item.get("id")
+                    or item.get("offer_id")
+                    or item.get("product_id")
+                    or "",
+                    "title_cn": title,
+                    "price_cny": price,
+                    "score": round(float(s), 3),
+                }
+            )
+
+        if not scored_items:
+            # 这个类目在你的价格带里没有合适的 1688 商品，就跳过
             continue
 
-        # 上限をかける
-        filtered_items = sorted(
-            filtered_items,
-            key=lambda x: x.get("score", 0),
-            reverse=True
-        )[:max_items]
+        # 类目本身的市场趋势分（如果有的话）
+        cat_trend_score = float(cat.get("score", 0.0))
+        avg_item_score = sum(i["score"] for i in scored_items) / len(scored_items)
+        total_score = cat_trend_score + 0.3 * avg_item_score
 
-        # 総合スコア = trend_score + 1688アイテムの平均scoreの0.3加点
-        trend_score = cat.get("trend_score", 0.0)
-        avg_item_score = sum(i.get("score", 0.0) for i in filtered_items) / len(filtered_items)
-        total_score = trend_score + 0.3 * avg_item_score
+        category_results.append(
+            {
+                "jp_category": cat.get("jp_category"),
+                "scene": cat.get("scene", ""),
+                "trend_reason": cat.get("trend_reason", ""),
+                "risk_level": cat.get("risk_level", ""),
+                "category_keyword_1688": kw,  # CSV 用に残しておく
+                "score": round(total_score, 4),
+                "items": sorted(scored_items, key=lambda x: x["score"], reverse=True),
+            }
+        )
 
-        scored_categories.append({
-            "jp_category": cat.get("jp_category"),
-            "scene": cat.get("scene"),
-            "trend_reason": cat.get("trend_reason"),
-            "score": round(total_score, 4),
-            "items": filtered_items,
-        })
-
-    # 4) スコア順にソートして top_k_categories だけ返す
-    scored_categories.sort(key=lambda c: c.get("score", 0), reverse=True)
-    top_k = req.top_k_categories if req.top_k_categories else 3
-    results = scored_categories[:top_k]
+    # 3) カテゴリ単位でソートして、top_k_categories 件だけ返す
+    category_results.sort(key=lambda c: c.get("score", 0), reverse=True)
+    top_k = req.top_k_categories or 3
+    category_results = category_results[:top_k]
 
     return {
-        "results": results
+        "results": category_results
     }
 
 @app.post(
@@ -1269,10 +1316,9 @@ def market_auto_select(req: MarketAutoSelectRequest):
     dependencies=[Depends(verify_token)],
 )
 def market_auto_select_csv(req: MarketAutoSelectRequest):
-
     """
     /market_auto_select 的 CSV 版：
-    - 按日本市场趋势选类目
+    - 按日本市场趋势选类目（已经是新逻辑）
     - 每个类目下的候选 SKU 打分
     - 全部打平成一张 CSV 表方便在 Excel 里筛选
     """
@@ -1282,16 +1328,15 @@ def market_auto_select_csv(req: MarketAutoSelectRequest):
     output = StringIO()
     writer = csv.writer(output)
 
-    # 表头：可以按需要以后再加列
     writer.writerow([
-        "jp_category",          # 日本侧类目
-        "scene",                # 使用场景
+        "jp_category",           # 日本侧类目
+        "scene",                 # 使用场景
         "risk_level",           # 风险等级
-        "category_keyword_1688",# 这次喂给 1688 的关键词
-        "item_id",              # 1688 商品ID（你先用自己的ID占位）
-        "title_cn",             # 中文标题
-        "price_cny",            # 进货价
-        "score",                # 你的选品打分
+        "category_keyword_1688", # 这次喂给 1688 的关键词
+        "item_id",               # 1688 商品ID
+        "title_cn",              # 中文标题
+        "price_cny",             # 进货价
+        "score",                 # 选品打分
     ])
 
     for cat in cats:
@@ -1314,6 +1359,7 @@ def market_auto_select_csv(req: MarketAutoSelectRequest):
 
     csv_text = '\ufeff' + output.getvalue()
     return csv_text
+
 
 @app.post("/rakuten_profit_simulate", dependencies=[Depends(verify_token)])
 def rakuten_profit_simulate(req: ProfitSimRequest):

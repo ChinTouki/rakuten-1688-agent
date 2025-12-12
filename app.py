@@ -1224,15 +1224,61 @@ def market_auto_select(req: MarketAutoSelectRequest):
             kw = cat.get("jp_category", "")
 
         # 2-2) 1688 検索（stub or 本番 API）
+        ms_req = MarketSuggestRequest(
+        budget_level=req.budget_level,
+        avoid_keywords=req.avoid_keywords,
+        top_k=req.top_k_categories,
+        market_sources=["rakuten", "amazon"],
+    )
+    trend_cats = get_jp_trending_categories(ms_req)
+
+    if not trend_cats and TREND_DATA:
+        trend_cats = TREND_DATA
+
+    if not trend_cats:
+        return {
+            "results": [],
+            "error": {
+                "code": "NO_TREND_DATA",
+                "message_ja": "市場トレンド情報が取得できませんでした。しばらくしてから再度お試しください。"
+            }
+        }
+
+    min_cny = req.min_price_cny if req.min_price_cny is not None else 0.0
+    max_cny = req.max_price_cny if req.max_price_cny is not None else 999999.0
+    max_items = req.max_items_per_category or 20
+
+    category_results: List[dict] = []
+
+    for cat in trend_cats:
+        # ---- 2-1) 1688 用キーワード決定 ----
+        kw_list = (
+            cat.get("suggested_1688_keywords")
+            or cat.get("keywords")
+            or []
+        )
+        if kw_list:
+            kw = kw_list[0]
+        else:
+            kw = cat.get("jp_category", "")
+
+        # ---- 2-2) まずは search_ali1688_by_cn_keyword を試す ----
+        raw_items = []
         try:
             raw_items = search_ali1688_by_cn_keyword(kw, max_items)
         except Exception as e:
-            logger.error("search_ali1688_by_cn_keyword failed for kw=%r: %r", kw, e)
-            raw_items = []
+            logger.error("search_ali1688_by_cn_keyword failed for %r: %r", kw, e)
+
+        # ★ 这里是关键：如果正式 1688 接口没数据，就退回本地 stub ★
+        if not raw_items:
+            logger.warning(
+                "No items from search_ali1688_by_cn_keyword for %r, fallback to search_1688_stub",
+                kw,
+            )
+            raw_items = search_1688_stub(kw, max_items)
 
         scored_items = []
         for item in raw_items or []:
-            # price_cny をできるだけ柔軟に取得
             raw_price = (
                 item.get("price_cny")
                 or item.get("price")
@@ -1254,7 +1300,6 @@ def market_auto_select(req: MarketAutoSelectRequest):
                 or ""
             )
 
-            # 既存の score_product を再利用して「日本向けのざっくりスコア」を付ける
             sel_req = SelectionRequest(
                 directions=[kw],
                 min_price_cny=min_cny,
@@ -1266,7 +1311,7 @@ def market_auto_select(req: MarketAutoSelectRequest):
                     sel_req,
                 )
             except Exception:
-                s = 0.5  # 评分算不出来就给个中间值
+                s = 0.5
 
             scored_items.append(
                 {
@@ -1281,10 +1326,9 @@ def market_auto_select(req: MarketAutoSelectRequest):
             )
 
         if not scored_items:
-            # 这个类目在你的价格带里没有合适的 1688 商品，就跳过
+            # 这个类目实在没有符合价格条件的，就跳过
             continue
 
-        # 类目本身的市场趋势分（如果有的话）
         cat_trend_score = float(cat.get("score", 0.0))
         avg_item_score = sum(i["score"] for i in scored_items) / len(scored_items)
         total_score = cat_trend_score + 0.3 * avg_item_score
@@ -1295,12 +1339,19 @@ def market_auto_select(req: MarketAutoSelectRequest):
                 "scene": cat.get("scene", ""),
                 "trend_reason": cat.get("trend_reason", ""),
                 "risk_level": cat.get("risk_level", ""),
-                "category_keyword_1688": kw,  # CSV 用に残しておく
+                "category_keyword_1688": kw,
                 "score": round(total_score, 4),
                 "items": sorted(scored_items, key=lambda x: x["score"], reverse=True),
             }
         )
 
+    category_results.sort(key=lambda c: c.get("score", 0), reverse=True)
+    top_k = req.top_k_categories or 3
+    category_results = category_results[:top_k]
+
+    return {
+        "results": category_results
+    }
     # 3) カテゴリ単位でソートして、top_k_categories 件だけ返す
     category_results.sort(key=lambda c: c.get("score", 0), reverse=True)
     top_k = req.top_k_categories or 3

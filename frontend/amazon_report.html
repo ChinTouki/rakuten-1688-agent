@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Amazon実績レポート & 楽天展開候補</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#020617" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-50 min-h-screen">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div>
+        <div class="text-sm font-semibold">TGT運営｜Amazon実績レポート</div>
+        <div class="text-xs text-slate-400">Amazon売上データから、楽天展開候補SKUを抽出</div>
+      </div>
+      <nav class="flex items-center space-x-2">
+        <a href="/ui/" class="text-[11px] px-2 py-1 rounded-lg border border-slate-700 text-slate-300">
+          楽天×1688 選品画面へ
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-4 space-y-4">
+    <!-- 条件入力 -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+      <h2 class="text-sm font-semibold mb-1">分析条件</h2>
+      <p class="text-xs text-slate-400 mb-2">
+        事前に <code class="px-1 py-0.5 bg-slate-800 rounded text-[10px]">data/amazon_reports/&lt;shop_id&gt;.json</code> を用意してください（CSV→JSON変換スクリプトを利用）。
+      </p>
+
+      <div class="grid grid-cols-3 gap-3 items-end">
+        <div>
+          <label class="block text-[11px] text-slate-300 mb-1">
+            Shop ID <span class="text-slate-500">(例：ht_amazon_main)</span>
+          </label>
+          <input
+            id="shopIdInput"
+            type="text"
+            class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-xs"
+            placeholder="ht_amazon_main"
+          />
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-300 mb-1">
+            対象月（任意）
+          </label>
+          <input
+            id="targetMonthInput"
+            type="month"
+            class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-xs"
+          />
+          <p class="text-[10px] text-slate-500 mt-1">
+            未指定の場合は全期間で集計します。
+          </p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button
+            id="runAnalysisBtn"
+            class="flex-1 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white"
+          >
+            分析を実行
+          </button>
+          <button
+            id="downloadCsvBtn"
+            class="px-3 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-100 disabled:opacity-40"
+            disabled
+          >
+            候補SKU CSV
+          </button>
+        </div>
+      </div>
+
+      <p id="analysisStatus" class="text-[11px] text-slate-400"></p>
+    </section>
+
+    <!-- GMV 概要 -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+      <h2 class="text-sm font-semibold mb-1">GMVサマリー</h2>
+      <div id="summaryCards" class="grid grid-cols-3 gap-3 text-sm">
+        <!-- JSで埋める -->
+      </div>
+    </section>
+
+    <!-- Top ASIN -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold">Top ASIN（売上順上位20件）</h2>
+        <p class="text-[11px] text-slate-400">Amazon側の主力SKUをざっと把握</p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-[11px] border-collapse">
+          <thead>
+            <tr class="bg-slate-800/60">
+              <th class="px-2 py-1 text-left font-medium border-b border-slate-700">#</th>
+              <th class="px-2 py-1 text-left font-medium border-b border-slate-700">ASIN</th>
+              <th class="px-2 py-1 text-left font-medium border-b border-slate-700">タイトル</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">売上(¥)</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">販売数</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">PV</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">セッション</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">CVR</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">ROAS</th>
+              <th class="px-2 py-1 text-center font-medium border-b border-slate-700">ランク</th>
+            </tr>
+          </thead>
+          <tbody id="topAsinTbody">
+            <!-- JSで埋める -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 楽天展開候補 -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3 mb-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold">楽天展開候補SKU</h2>
+        <p class="text-[11px] text-slate-400">
+          売上・転換率が高い A/B ランクの商品を、楽天出店の候補として抽出。
+        </p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-[11px] border-collapse">
+          <thead>
+            <tr class="bg-slate-800/60">
+              <th class="px-2 py-1 text-left font-medium border-b border-slate-700">ASIN</th>
+              <th class="px-2 py-1 text-left font-medium border-b border-slate-700">タイトル</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">Amazon売上(¥)</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">販売数</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">推奨ランク</th>
+              <th class="px-2 py-1 text-right font-medium border-b border-slate-700">CVR</th>
+              <th class="px-2 py-1 text-left font-medium border-b border-slate-700">コメント</th>
+            </tr>
+          </thead>
+          <tbody id="rakutenCandidatesTbody">
+            <!-- JSで埋める -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ====== 共通：Token & secureFetch ======
+    const TOKEN_STORAGE_KEY = "rakuten_agent_token_v1";
+    let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+
+    async function ensureToken() {
+      if (!agentToken) {
+        const input = window.prompt("運営エージェント用パスワードを入力してください：");
+        if (!input) {
+          throw new Error("パスワードが入力されていません。");
+        }
+        agentToken = input.trim();
+        localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
+      }
+    }
+
+    async function secureFetch(url, options = {}) {
+      await ensureToken();
+
+      const headers = options.headers || {};
+      if (!headers["Content-Type"] && !(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+      }
+      headers["X-Agent-Token"] = agentToken;
+
+      const resp = await fetch(url, { ...options, headers });
+
+      if (resp.status === 401) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        agentToken = "";
+        alert("パスワードが間違っています。もう一度お試しください。");
+        throw new Error("Unauthorized");
+      }
+
+      return resp;
+    }
+
+    // ====== 分析ロジック ======
+    let lastAmazonAnalysis = null;
+
+    const statusEl = document.getElementById("analysisStatus");
+    const summaryCardsEl = document.getElementById("summaryCards");
+    const topAsinTbody = document.getElementById("topAsinTbody");
+    const rakutenCandidatesTbody = document.getElementById("rakutenCandidatesTbody");
+    const downloadCsvBtn = document.getElementById("downloadCsvBtn");
+
+    document.getElementById("runAnalysisBtn").addEventListener("click", async () => {
+      const shopId = (document.getElementById("shopIdInput").value || "").trim();
+      const targetMonth = document.getElementById("targetMonthInput").value || null;
+
+      if (!shopId) {
+        statusEl.textContent = "Shop ID を入力してください。";
+        statusEl.className = "text-[11px] text-red-400";
+        return;
+      }
+
+      statusEl.textContent = "分析中…（/amazon/analysis/summary にリクエスト中）";
+      statusEl.className = "text-[11px] text-slate-400";
+
+      summaryCardsEl.innerHTML = "";
+      topAsinTbody.innerHTML = "";
+      rakutenCandidatesTbody.innerHTML = "";
+      downloadCsvBtn.disabled = true;
+
+      try {
+        const payload = { shop_id: shopId, target_month: targetMonth };
+        const resp = await secureFetch("/amazon/analysis/summary", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+
+        if (!resp.ok) {
+          throw new Error("HTTP " + resp.status);
+        }
+        const data = await resp.json();
+        if (!data.ok) {
+          statusEl.textContent = data.message || "分析に失敗しました。";
+          statusEl.className = "text-[11px] text-red-400";
+          return;
+        }
+
+        lastAmazonAnalysis = data;
+        statusEl.textContent = "分析完了：shop_id=" + data.shop_id +
+          " ／ 対象=" + (data.target_month || "全期間");
+        statusEl.className = "text-[11px] text-emerald-400";
+
+        renderSummary(data.summary);
+        renderTopAsins(data.top_asins || []);
+        renderRakutenCandidates(data.rakuten_candidates || []);
+
+        if ((data.rakuten_candidates || []).length > 0) {
+          downloadCsvBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "分析に失敗しました：" + err;
+        statusEl.className = "text-[11px] text-red-400";
+      }
+    });
+
+    function renderSummary(summary) {
+      if (!summary) return;
+      const totalSales = summary.total_sales_jpy || 0;
+      const totalUnits = summary.total_units || 0;
+      const asinCount = summary.asin_count || 0;
+
+      summaryCardsEl.innerHTML = `
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3">
+          <div class="text-[11px] text-slate-400 mb-1">総売上（期間合計）</div>
+          <div class="text-lg font-semibold text-emerald-400">
+            ¥${totalSales.toLocaleString()}
+          </div>
+        </div>
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3">
+          <div class="text-[11px] text-slate-400 mb-1">販売点数</div>
+          <div class="text-lg font-semibold text-slate-50">${totalUnits.toLocaleString()} 点</div>
+        </div>
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3">
+          <div class="text-[11px] text-slate-400 mb-1">ASIN数</div>
+          <div class="text-lg font-semibold text-slate-50">${asinCount.toLocaleString()} SKU</div>
+        </div>
+      `;
+    }
+
+    function fmtPercent(x) {
+      if (x == null) return "-";
+      return (x * 100).toFixed(1) + "%";
+    }
+
+    function fmtRoas(x) {
+      if (x == null) return "-";
+      return x.toFixed(1);
+    }
+
+    function renderTopAsins(list) {
+      if (!list.length) {
+        topAsinTbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="px-2 py-2 text-center text-slate-500">
+              データがありません。
+            </td>
+          </tr>`;
+        return;
+      }
+
+      topAsinTbody.innerHTML = "";
+      list.forEach((st, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = idx % 2 === 0 ? "bg-slate-950" : "bg-slate-900/70";
+
+        tr.innerHTML = `
+          <td class="px-2 py-1 border-b border-slate-800">${idx + 1}</td>
+          <td class="px-2 py-1 border-b border-slate-800 font-mono text-[10px]">${st.asin}</td>
+          <td class="px-2 py-1 border-b border-slate-800">${st.title || ""}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">¥${(st.sales_jpy || 0).toLocaleString()}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${(st.units || 0).toLocaleString()}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${(st.page_views || 0).toLocaleString()}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${(st.sessions || 0).toLocaleString()}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${fmtPercent(st.conversion_rate)}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${fmtRoas(st.roas)}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-center">
+            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px]
+              ${st.sales_rank === 'A' ? 'bg-emerald-600/80 text-emerald-50' :
+                st.sales_rank === 'B' ? 'bg-sky-600/70 text-sky-50' :
+                'bg-slate-700 text-slate-50'}">
+              ${st.sales_rank || '-'}
+            </span>
+          </td>
+        `;
+        topAsinTbody.appendChild(tr);
+      });
+    }
+
+    function renderRakutenCandidates(list) {
+      if (!list.length) {
+        rakutenCandidatesTbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-2 py-2 text-center text-slate-500">
+              現時点では楽天展開候補のSKUが抽出されていません。
+            </td>
+          </tr>`;
+        return;
+      }
+
+      rakutenCandidatesTbody.innerHTML = "";
+      list.forEach((st) => {
+        const tr = document.createElement("tr");
+        tr.className = "bg-slate-950";
+
+        tr.innerHTML = `
+          <td class="px-2 py-1 border-b border-slate-800 font-mono text-[10px]">${st.asin}</td>
+          <td class="px-2 py-1 border-b border-slate-800">${st.title || ""}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">¥${(st.amazon_sales_jpy || 0).toLocaleString()}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${(st.units || 0).toLocaleString()}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${st.sales_rank || '-'}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-right">${fmtPercent(st.conversion_rate)}</td>
+          <td class="px-2 py-1 border-b border-slate-800 text-left">${st.reason || ""}</td>
+        `;
+        rakutenCandidatesTbody.appendChild(tr);
+      });
+    }
+
+    // ====== CSV ダウンロード ======
+    downloadCsvBtn.addEventListener("click", () => {
+      if (!lastAmazonAnalysis || !(lastAmazonAnalysis.rakuten_candidates || []).length) {
+        return;
+      }
+      const rows = lastAmazonAnalysis.rakuten_candidates;
+      const header = [
+        "asin",
+        "title",
+        "amazon_sales_jpy",
+        "units",
+        "sales_rank",
+        "conversion_rate",
+        "suggested_rakuten_price_jpy",
+        "reason",
+      ];
+      const lines = [header.join(",")];
+
+      rows.forEach((st) => {
+        const line = [
+          st.asin || "",
+          (st.title || "").replace(/"/g, '""'),
+          st.amazon_sales_jpy ?? "",
+          st.units ?? "",
+          st.sales_rank ?? "",
+          st.conversion_rate != null ? st.conversion_rate : "",
+          st.suggested_rakuten_price_jpy ?? "",
+          (st.reason || "").replace(/"/g, '""'),
+        ].map((v) => `"${v}"`).join(",");
+        lines.push(line);
+      });
+
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "rakuten_candidates.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // 初回でパスワード確認だけ一度動かす
+    document.addEventListener("DOMContentLoaded", () => {
+      ensureToken().catch(() => {});
+    });
+  </script>
+</body>
+</html>

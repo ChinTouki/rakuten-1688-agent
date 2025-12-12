@@ -1,0 +1,152 @@
+[
+  {
+    "category_id": "supplement_general",
+    "jp_category": "サプリメント・健康食品（総合）",
+    "scene": "40〜60代の健康意識が高い男女向け。定期購入になりやすい基本サプリ。",
+    "avg_price_jpy": 2980,
+    "trend_score": 0.93,
+    "trend_reason": "Amazon/楽天ともにマルチビタミン・オールインワンサプリが安定して上位。リピート率が高く、広告との相性も良い領域。",
+    "keywords": ["サプリメント", "健康食品", "ビタミン", "ミネラル"],
+    "items": [
+      {
+        "id": "sup_multi_01",
+        "title_cn": "成人综合维生素矿物质片 中老年适用（示例）",
+        "price_cny": 24.8,
+        "score": 0.90
+      },
+      {
+        "id": "sup_multi_02",
+        "title_cn": "复合维生素B族营养片 办公族（示例）",
+        "price_cny": 19.5,
+        "score": 0.86
+      },
+      {
+        "id": "sup_multi_03",
+        "title_cn": "高吸收深海鱼油软胶囊 DHA EPA（示例）",
+        "price_cny": 32.0,
+        "score": 0.88
+      }
+    ]
+  },
+  {
+    "category_id": "supplement_women_beauty",
+    "jp_category": "女性向け美容サプリ",
+    "scene": "30〜50代女性の美容・エイジングケア。楽天で特に強いカテゴリ。",
+    "avg_price_jpy": 3480,
+    "trend_score": 0.91,
+    "trend_reason": "コラーゲン、ヒアルロン酸、プラセンタ系サプリが継続して人気。まとめ買い・定期購入も狙えるジャンル。",
+    "keywords": ["美容", "コラーゲン", "プラセンタ", "ヒアルロン酸"],
+    "items": [
+      {
+        "id": "sup_beauty_01",
+        "title_cn": "鱼胶原蛋白肽粉 饮品型美容营养（示例）",
+        "price_cny": 36.0,
+        "score": 0.89
+      },
+      {
+        "id": "sup_beauty_02",
+        "title_cn": "胶原蛋白+透明质酸 复合美容片（示例）",
+        "price_cny": 27.5,
+        "score": 0.87
+      }
+    ]
+  },
+  {
+    "category_id": "daily_household",
+    "jp_category": "生活雑貨・日用消耗品",
+    "scene": "共働き・子育て世代の家事を時短する便利グッズ。",
+    "avg_price_jpy": 1980,
+    "trend_score": 0.88,
+    "trend_reason": "収納用品・掃除用品・ランドリーグッズなど、レビュー数が多くリピートも期待できるカテゴリ。",
+    "keywords": ["収納", "掃除", "ランドリー", "日用品"],
+    "items": [
+      {
+        "id": "daily_01",
+        "title_cn": "多层挂式衣柜收纳袋 节省空间（示例）",
+        "price_cny": 22.0,
+        "score": 0.85
+      },
+      {
+        "id": "daily_02",
+        "title_cn": "可伸缩厨房置物架 水槽收纳架（示例）",
+        "price_cny": 18.5,
+        "score": 0.84
+      },
+      {
+        "id": "daily_03",
+        "title_cn": "墙挂式拖把收纳架 清洁工具挂架（示例）",
+        "price_cny": 16.0,
+        "score": 0.82
+      }
+    ]
+  },
+  {
+    "category_id": "storage_home",
+    "jp_category": "収納・整理整頓グッズ",
+    "scene": "インテリアを崩さず、見せる収納・隠す収納を両立したい層向け。",
+    "avg_price_jpy": 2480,
+    "trend_score": 0.87,
+    "trend_reason": "楽天内で『収納』『整理』『ラック』系キーワードは常に検索数が多い。セット販売で単価アップも可能。",
+    "keywords": ["収納ボックス", "ラック", "クローゼット", "整理整頓"],
+    "items": [
+      {
+        "id": "storage_01",
+        "title_cn": "可折叠布艺收纳箱 带盖可视窗（示例）",
+        "price_cny": 20.0,
+        "score": 0.83
+      },
+      {
+        "id": "storage_02",
+        "title_cn": "衣柜分層板 扩展隔板 免打孔（示例）",
+        "price_cny": 17.5,
+        "score": 0.81
+      }
+    ]
+  },
+  {
+    "category_id": "pet_goods",
+    "jp_category": "ペット用品（犬・猫）",
+    "scene": "犬猫用おやつ・ケア用品・日用雑貨。ペット単価が高く、感情訴求しやすい。",
+    "avg_price_jpy": 2580,
+    "trend_score": 0.86,
+    "trend_reason": "ペット市場は右肩上がり。ケア用品・便利グッズはリピート＆関連購入を狙いやすい。",
+    "keywords": ["ペット", "犬", "猫", "ケア用品"],
+    "items": [
+      {
+        "id": "pet_01",
+        "title_cn": "宠物硅胶洗脚杯 外出清洁狗狗爪子（示例）",
+        "price_cny": 21.0,
+        "score": 0.82
+      },
+      {
+        "id": "pet_02",
+        "title_cn": "宠物毛发梳理手套 一边撸猫一边除毛（示例）",
+        "price_cny": 14.5,
+        "score": 0.80
+      }
+    ]
+  },
+  {
+    "category_id": "healthcare_small_device",
+    "jp_category": "ヘルスケア小型機器",
+    "scene": "在宅ワーク・高齢世代の体調管理ニーズ。体重計・血圧計・体温計周辺。",
+    "avg_price_jpy": 3980,
+    "trend_score": 0.84,
+    "trend_reason": "コロナ以降、自宅で測定できるヘルスケア機器の需要が安定。関連消耗品とのセットも組みやすい。",
+    "keywords": ["体重計", "血圧計", "体温計", "ヘルスケア"],
+    "items": [
+      {
+        "id": "health_dev_01",
+        "title_cn": "蓝牙体重脂肪秤 手机APP联动（示例）",
+        "price_cny": 52.0,
+        "score": 0.83
+      },
+      {
+        "id": "health_dev_02",
+        "title_cn": "上臂式电子血压计 家用款（示例）",
+        "price_cny": 60.0,
+        "score": 0.82
+      }
+    ]
+  }
+]

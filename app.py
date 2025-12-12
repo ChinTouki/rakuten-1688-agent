@@ -27,6 +27,55 @@ from tools.ali1688_url_parser import parse_1688_url, Ali1688UrlParseError
 from tools.ali1688_stub import search_ali1688_by_cn_keyword
 from tools.ali1688_url_parser import parse_1688_url, Ali1688UrlParseError
 
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+from pathlib import Path
+from datetime import datetime
+from fastapi import Depends
+
+logger = logging.getLogger(__name__)
+
+# ==== 读取本地趋势候选数据 ====
+TREND_DATA: List[dict] = []
+try:
+    TREND_PATH = Path(__file__).parent / "data" / "trend_candidates.json"
+    with TREND_PATH.open("r", encoding="utf-8") as f:
+        TREND_DATA = json.load(f)
+    logger.info("Loaded trend candidates: %d categories", len(TREND_DATA))
+except Exception as e:
+    logger.error("Failed to load trend_candidates.json: %r", e)
+    TREND_DATA = []
+
+# === Amazon 报表相关 Model ===
+
+class AmazonDailyRecord(BaseModel):
+    date: str          # "2025-11-01"
+    asin: str
+    sku: Optional[str] = None
+    title: Optional[str] = None
+    units: int
+    sales_jpy: float
+    page_views: Optional[int] = None
+    sessions: Optional[int] = None
+    conversion_rate: Optional[float] = None
+    ad_spend_jpy: Optional[float] = None
+    # category: Optional[str] = None  # 以后你可以加上
+
+class AmazonReportUpload(BaseModel):
+    shop_id: str
+    records: List[AmazonDailyRecord]
+
+class AmazonAnalysisRequest(BaseModel):
+    shop_id: str
+    target_month: Optional[str] = None  # "2025-11" 等，留空=全期间
+
+
+# === 数据文件路径 ===
+BASE_DIR = Path(__file__).resolve().parent
+AMAZON_DATA_DIR = BASE_DIR / "data" / "amazon_reports"
+AMAZON_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
 
 # 读取 .env
 load_dotenv()
@@ -882,6 +931,29 @@ def generate_rakuten_listing_copy(req: ListingCopyRequest) -> dict:
 
     return data
 
+def load_amazon_records(shop_id: str) -> List[Dict[str, Any]]:
+    path = AMAZON_DATA_DIR / f"{shop_id}.json"
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def filter_by_month(records: List[Dict[str, Any]], target_month: Optional[str]) -> List[Dict[str, Any]]:
+    if not target_month:
+        return records
+    # target_month 例如 "2025-11"
+    ym = target_month
+    out = []
+    for r in records:
+        d = (r.get("date") or "").strip()
+        try:
+            dt = datetime.fromisoformat(d)
+        except Exception:
+            continue
+        if dt.strftime("%Y-%m") == ym:
+            out.append(r)
+    return out
 
 
 @app.get("/")
@@ -1103,83 +1175,92 @@ def market_suggest(req: MarketSuggestRequest):
 @app.post("/market_auto_select", dependencies=[Depends(verify_token)])
 def market_auto_select(req: MarketAutoSelectRequest):
     """
-    一键管道：
-      1. 根据日本乐天週間ランキング，按预算和避开关键词选出若干热门类目
-      2. 为每个类目选一个 1688 搜索关键词
-      3. 使用现有的打分逻辑（score_product）对 1688 候选商品打分
+    楽天＋Amazonトレンド（ローカルJSON） + 1688候補商品一覧 から
+    パラメータに応じてカテゴリをスコアリングして返す。
     """
-    # 1) 先根据日本市场情况选类目（复用 get_jp_trending_categories）
-    ms_req = MarketSuggestRequest(
-    budget_level=req.budget_level,
-    avoid_keywords=req.avoid_keywords,
-    top_k=req.top_k_categories,
-    market_sources=["rakuten", "amazon"],  # 默认两边一起看
-)
 
-    trending_cats = get_jp_trending_categories(ms_req)
-
-    results = []
-
-    for cat in trending_cats:
-        # 2) 选一个喂给 1688 的搜索关键词
-        kw_list = cat.get("suggested_1688_keywords") or []
-        if kw_list:
-            category_kw = kw_list[0]   # 先用第一个关键词
-        else:
-            # 没有预设关键词时，就用日文类目名，后面你可以自己映射成中文
-            category_kw = cat["jp_category"]
-
-        # 3) 类目对应的 1688 候选商品（现在用 stub，将来你把这行换成真实 API 即可）
-        raw_products = search_1688_stub(category_kw, req.max_items_per_category)
-
-        # 4) 用你现有的规则对候选商品做价格过滤 + 打分
-        sel_req = SelectionRequest(
-            directions=[category_kw],  # 当成方向关键词，用于 score_product 里的匹配
-            min_price_cny=req.min_price_cny,
-            max_price_cny=req.max_price_cny,
-        )
-
-        scored_items = []
-        for p in raw_products:
-            price = p.get("price_cny", 0.0)
-            # 价格过滤
-            if not (req.min_price_cny <= price <= req.max_price_cny):
-                continue
-
-            s = score_product(p, sel_req)
-
-            scored_items.append(
-                {
-                    "id": p.get("id", ""),
-                    "title_cn": p.get("title_cn", ""),
-                    "price_cny": price,
-                    "score": round(s, 3),
-                }
-            )
-
-        # 按分数从高到低排序
-        scored_items.sort(key=lambda x: x["score"], reverse=True)
-
-        results.append(
-            {
-                "jp_category": cat["jp_category"],
-                "scene": cat.get("scene", ""),
-                "trend_reason": cat.get("trend_reason", ""),
-                "category_keyword_1688": category_kw,
-                "suggested_1688_keywords": kw_list,
-                "risk_level": cat.get("risk_level", "low"),
-                "risk_notes": cat.get("risk_notes", ""),
-                "items": scored_items,
+    if not TREND_DATA:
+        return {
+            "results": [],
+            "error": {
+                "code": "NO_TREND_DATA",
+                "message_ja": "トレンド候補データが読み込まれていません。管理者にお問い合わせください。"
             }
-        )
+        }
+
+    # 1) 避けたいキーワードでカテゴリをフィルタ
+    avoid_lower = [kw.strip().lower() for kw in (req.avoid_keywords or []) if kw.strip()]
+    def is_avoided(cat: dict) -> bool:
+        text = (
+            (cat.get("jp_category") or "") + " " +
+            (cat.get("scene") or "") + " " +
+            " ".join(cat.get("keywords") or [])
+        ).lower()
+        return any(kw in text for kw in avoid_lower)
+
+    candidates = [c for c in TREND_DATA if not is_avoided(c)]
+
+    # 2) budget_level で平均価格帯フィルタ
+    def match_budget(cat: dict) -> bool:
+        price = cat.get("avg_price_jpy") or 3000
+        if req.budget_level == "low":
+            return price <= 3000
+        if req.budget_level == "mid":
+            return 2000 <= price <= 8000
+        if req.budget_level == "high":
+            return price >= 5000
+        return True  # 不明な場合は通す
+
+    candidates = [c for c in candidates if match_budget(c)]
+
+    # 3) 各カテゴリ内の 1688 商品を価格帯でフィルタ
+    min_cny = req.min_price_cny if req.min_price_cny is not None else 0.0
+    max_cny = req.max_price_cny if req.max_price_cny is not None else 999999.0
+    max_items = req.max_items_per_category if req.max_items_per_category else 20
+
+    scored_categories = []
+    for cat in candidates:
+        raw_items = cat.get("items") or []
+        filtered_items = []
+        for it in raw_items:
+            price = it.get("price_cny")
+            if price is None:
+                continue
+            if not (min_cny <= price <= max_cny):
+                continue
+            filtered_items.append(it)
+
+        if not filtered_items:
+            # このカテゴリでは指定価格帯の1688商品がない
+            continue
+
+        # 上限をかける
+        filtered_items = sorted(
+            filtered_items,
+            key=lambda x: x.get("score", 0),
+            reverse=True
+        )[:max_items]
+
+        # 総合スコア = trend_score + 1688アイテムの平均scoreの0.3加点
+        trend_score = cat.get("trend_score", 0.0)
+        avg_item_score = sum(i.get("score", 0.0) for i in filtered_items) / len(filtered_items)
+        total_score = trend_score + 0.3 * avg_item_score
+
+        scored_categories.append({
+            "jp_category": cat.get("jp_category"),
+            "scene": cat.get("scene"),
+            "trend_reason": cat.get("trend_reason"),
+            "score": round(total_score, 4),
+            "items": filtered_items,
+        })
+
+    # 4) スコア順にソートして top_k_categories だけ返す
+    scored_categories.sort(key=lambda c: c.get("score", 0), reverse=True)
+    top_k = req.top_k_categories if req.top_k_categories else 3
+    results = scored_categories[:top_k]
 
     return {
-        "budget_level": req.budget_level,
-        "avoid_keywords": req.avoid_keywords,
-        "top_k_categories": req.top_k_categories,
-        "min_price_cny": req.min_price_cny,
-        "max_price_cny": req.max_price_cny,
-        "results": results,
+        "results": results
     }
 
 @app.post(
@@ -1373,3 +1454,124 @@ def rakuten_listing_copy(req: ListingCopyRequest):
                 "raw_text": content,
             },
         }
+@app.post("/amazon/analysis/summary", dependencies=[Depends(verify_token)])
+def amazon_analysis_summary(req: AmazonAnalysisRequest):
+    """
+    读 data/amazon_reports/{shop_id}.json，
+    做一个简单的经营概况 + 乐天展開候補列表。
+    """
+    records = load_amazon_records(req.shop_id)
+    if not records:
+        return {
+            "ok": False,
+            "message": f"shop_id={req.shop_id} のAmazonデータが見つかりません。",
+        }
+
+    recs = filter_by_month(records, req.target_month)
+
+    if not recs:
+        return {
+            "ok": False,
+            "message": f"指定期間（{req.target_month or '全期間'}）のデータがありません。",
+        }
+
+    # ===== 1) GMV & 全体指标 =====
+    total_sales = 0.0
+    total_units = 0
+    asin_stats: Dict[str, Dict[str, Any]] = {}
+
+    for r in recs:
+        asin = r["asin"]
+        sales = float(r.get("sales_jpy") or 0.0)
+        units = int(r.get("units") or 0)
+
+        total_sales += sales
+        total_units += units
+
+        if asin not in asin_stats:
+            asin_stats[asin] = {
+                "asin": asin,
+                "title": r.get("title"),
+                "sales_jpy": 0.0,
+                "units": 0,
+                "page_views": 0,
+                "sessions": 0,
+                "ad_spend_jpy": 0.0,
+            }
+
+        st = asin_stats[asin]
+        st["sales_jpy"] += sales
+        st["units"] += units
+        st["page_views"] += int(r.get("page_views") or 0)
+        st["sessions"] += int(r.get("sessions") or 0)
+        st["ad_spend_jpy"] += float(r.get("ad_spend_jpy") or 0.0)
+
+    # 计算单个 ASIN 的转化率 & ROAS（粗略）
+    for st in asin_stats.values():
+        pv = st["page_views"]
+        sess = st["sessions"]
+        units = st["units"]
+        spend = st["ad_spend_jpy"]
+        sales = st["sales_jpy"]
+
+        # session 转化率
+        if sess > 0:
+            st["conversion_rate"] = units / sess
+        else:
+            st["conversion_rate"] = None
+
+        # ROAS (Return on Ad Spend)
+        if spend > 0:
+            st["roas"] = sales / spend
+        else:
+            st["roas"] = None
+
+        # 简单打一个销售等级（以后可以用毛利/1688成本细化）
+        if sales >= 3_000_000:
+            st["sales_rank"] = "A"
+        elif sales >= 1_000_000:
+            st["sales_rank"] = "B"
+        else:
+            st["sales_rank"] = "C"
+
+    # ===== 2) Top ASIN 列表 =====
+    asin_list = sorted(asin_stats.values(), key=lambda x: x["sales_jpy"], reverse=True)
+    top_asins = asin_list[:20]
+
+    # ===== 3) 乐天推广候补：简单版策略 =====
+    rakuten_candidates = []
+    for st in asin_list:
+        # 示例策略：
+        #   - 销售等级 A/B
+        #   - 转化率不太差（或者缺失就放行）
+        cv = st["conversion_rate"]
+        if st["sales_rank"] in ("A", "B") and (cv is None or cv >= 0.05):
+            rakuten_candidates.append(
+                {
+                    "asin": st["asin"],
+                    "title": st["title"],
+                    "amazon_sales_jpy": st["sales_jpy"],
+                    "units": st["units"],
+                    # 下面这些你后面可以接 /rakuten_profit_simulate 算出更精确的价格
+                    "suggested_rakuten_price_jpy": None,
+                    "reason": "Amazonで売上・転換率が高い中核SKUのため、楽天展開候補として優先的に検討。",
+                    "sales_rank": st["sales_rank"],
+                    "conversion_rate": st["conversion_rate"],
+                }
+            )
+
+    # 只拿前 30 个候补，避免太长
+    rakuten_candidates = rakuten_candidates[:30]
+
+    return {
+        "ok": True,
+        "shop_id": req.shop_id,
+        "target_month": req.target_month,
+        "summary": {
+            "total_sales_jpy": total_sales,
+            "total_units": total_units,
+            "asin_count": len(asin_stats),
+        },
+        "top_asins": top_asins,
+        "rakuten_candidates": rakuten_candidates,
+    }

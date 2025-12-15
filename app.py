@@ -1178,7 +1178,9 @@ def market_auto_select(req: MarketAutoSelectRequest):
     日本市場トレンド（楽天＋Amazon stub）＋ 1688 検索 から
     カテゴリ候補とその配下の SKU を自動で選定して返す。
 
-    ※ もう TREND_DATA の「3本固定データ」には依存しない。
+    - 楽天週間ランキング ＋ Amazon stub で「今強いカテゴリ」を取る
+    - 各カテゴリごとに 1688 検索（本番API → 失敗/0件ならローカルstub）
+    - 価格レンジで絞り込み ＋ 簡易スコアリング
     """
 
     # 1) 日本側の「今売れているカテゴリ」を取得
@@ -1190,7 +1192,7 @@ def market_auto_select(req: MarketAutoSelectRequest):
     )
     trend_cats = get_jp_trending_categories(ms_req)
 
-    # もし何らかの理由で 0 件になった場合だけ、最後の最後に TREND_DATA を使う（完全真空回避用）
+    # 何らかの理由で 0 件になった場合だけ、最後の最後に TREND_DATA を使う（完全真空回避用）
     if not trend_cats and TREND_DATA:
         trend_cats = TREND_DATA
 
@@ -1204,46 +1206,6 @@ def market_auto_select(req: MarketAutoSelectRequest):
         }
 
     # 2) 各カテゴリに対して 1688 から候補 SKU を取得
-    min_cny = req.min_price_cny if req.min_price_cny is not None else 0.0
-    max_cny = req.max_price_cny if req.max_price_cny is not None else 999999.0
-    max_items = req.max_items_per_category or 20
-
-    category_results: List[dict] = []
-
-    for cat in trend_cats:
-        # 2-1) 1688 用キーワードを決める
-        kw_list = (
-            cat.get("suggested_1688_keywords")
-            or cat.get("keywords")
-            or []
-        )
-        if kw_list:
-            kw = kw_list[0]
-        else:
-            # どうしてもなければ、日本語カテゴリ名をそのまま突っ込む
-            kw = cat.get("jp_category", "")
-
-        # 2-2) 1688 検索（stub or 本番 API）
-        ms_req = MarketSuggestRequest(
-        budget_level=req.budget_level,
-        avoid_keywords=req.avoid_keywords,
-        top_k=req.top_k_categories,
-        market_sources=["rakuten", "amazon"],
-    )
-    trend_cats = get_jp_trending_categories(ms_req)
-
-    if not trend_cats and TREND_DATA:
-        trend_cats = TREND_DATA
-
-    if not trend_cats:
-        return {
-            "results": [],
-            "error": {
-                "code": "NO_TREND_DATA",
-                "message_ja": "市場トレンド情報が取得できませんでした。しばらくしてから再度お試しください。"
-            }
-        }
-
     min_cny = req.min_price_cny if req.min_price_cny is not None else 0.0
     max_cny = req.max_price_cny if req.max_price_cny is not None else 999999.0
     max_items = req.max_items_per_category or 20
@@ -1290,6 +1252,7 @@ def market_auto_select(req: MarketAutoSelectRequest):
             except Exception:
                 continue
 
+            # 价格过滤
             if not (min_cny <= price <= max_cny):
                 continue
 
@@ -1305,12 +1268,14 @@ def market_auto_select(req: MarketAutoSelectRequest):
                 min_price_cny=min_cny,
                 max_price_cny=max_cny,
             )
+
             try:
                 s = score_product(
                     {"title_cn": title, "price_cny": price},
                     sel_req,
                 )
-            except Exception:
+            except Exception as e:
+                logger.error("score_product failed for %r: %r", title, e)
                 s = 0.5
 
             scored_items.append(
@@ -1325,10 +1290,11 @@ def market_auto_select(req: MarketAutoSelectRequest):
                 }
             )
 
+        # 这个类目实在没有符合价格条件的，就跳过
         if not scored_items:
-            # 这个类目实在没有符合价格条件的，就跳过
             continue
 
+        # カテゴリ側トレンドスコア＋商品平均スコアでカテゴリ総合スコアを作る
         cat_trend_score = float(cat.get("score", 0.0))
         avg_item_score = sum(i["score"] for i in scored_items) / len(scored_items)
         total_score = cat_trend_score + 0.3 * avg_item_score
@@ -1345,13 +1311,16 @@ def market_auto_select(req: MarketAutoSelectRequest):
             }
         )
 
-    category_results.sort(key=lambda c: c.get("score", 0), reverse=True)
-    top_k = req.top_k_categories or 3
-    category_results = category_results[:top_k]
+    # 全部类别都被价格/数据条件过滤掉的情况
+    if not category_results:
+        return {
+            "results": [],
+            "error": {
+                "code": "NO_ITEMS_FOR_TRENDS",
+                "message_ja": "市場トレンドは取得できましたが、条件に合う1688商品が見つかりませんでした。条件を少し緩めて再度お試しください。"
+            }
+        }
 
-    return {
-        "results": category_results
-    }
     # 3) カテゴリ単位でソートして、top_k_categories 件だけ返す
     category_results.sort(key=lambda c: c.get("score", 0), reverse=True)
     top_k = req.top_k_categories or 3
@@ -1360,6 +1329,7 @@ def market_auto_select(req: MarketAutoSelectRequest):
     return {
         "results": category_results
     }
+
 
 @app.post(
     "/market_auto_select_csv",
@@ -1672,3 +1642,16 @@ def amazon_analysis_summary(req: AmazonAnalysisRequest):
         "top_asins": top_asins,
         "rakuten_candidates": rakuten_candidates,
     }
+
+@app.post("/rakuten_candidates_from_amazon", dependencies=[Depends(verify_token)])
+def rakuten_candidates_from_amazon(req: AmazonAnalysisRequest):
+    summary = amazon_analysis_summary(req)
+    if not summary.get("ok"):
+        return summary
+
+    candidates = summary["rakuten_candidates"]  # 这里已经是筛好的 ASIN 列表
+    # 后面你可以在这里：
+    # - 把 ASIN 的 title → 用 LLM 提取“类目关键词”
+    # - 然后拼成 /market_suggest 的 avoid_keywords / 重点类目
+    # - 或者生成一个“推荐上架清单 CSV”
+    return summary

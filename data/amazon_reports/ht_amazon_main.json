@@ -1,0 +1,98 @@
+[
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTCABLE01",
+    "sku": "HT-USB-CAB-1",
+    "title": "USB-C 充電ケーブル 1m PD対応",
+    "units": 1600,
+    "sales_jpy": 3200000.0,
+    "page_views": 20000,
+    "sessions": 15000,
+    "conversion_rate": null,
+    "ad_spend_jpy": 320000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTCABLE02",
+    "sku": "HT-USB-CAB-3",
+    "title": "USB-C 充電ケーブル 3本セット 1m",
+    "units": 900,
+    "sales_jpy": 2100000.0,
+    "page_views": 14000,
+    "sessions": 10000,
+    "conversion_rate": null,
+    "ad_spend_jpy": 210000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTHUB001",
+    "sku": "HT-USB-HUB-1",
+    "title": "USB-C ハブ 6in1 HDMI対応",
+    "units": 450,
+    "sales_jpy": 1800000.0,
+    "page_views": 9000,
+    "sessions": 6500,
+    "conversion_rate": null,
+    "ad_spend_jpy": 190000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTHUB002",
+    "sku": "HT-USB-HUB-2",
+    "title": "USB-C ドッキングステーション 9in1",
+    "units": 260,
+    "sales_jpy": 1300000.0,
+    "page_views": 6000,
+    "sessions": 4300,
+    "conversion_rate": null,
+    "ad_spend_jpy": 160000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTCASE01",
+    "sku": "HT-IP15-CASE",
+    "title": "iPhone 15 用 クリア耐衝撃ケース",
+    "units": 380,
+    "sales_jpy": 760000.0,
+    "page_views": 8000,
+    "sessions": 5500,
+    "conversion_rate": null,
+    "ad_spend_jpy": 70000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTGLASS01",
+    "sku": "HT-IP15-GLS",
+    "title": "iPhone 15 用 ガラスフィルム 2枚セット",
+    "units": 520,
+    "sales_jpy": 520000.0,
+    "page_views": 9000,
+    "sessions": 6000,
+    "conversion_rate": null,
+    "ad_spend_jpy": 65000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTCABLE03",
+    "sku": "HT-LGT-CAB-1",
+    "title": "Lightning 充電ケーブル 1m MFi相当",
+    "units": 300,
+    "sales_jpy": 600000.0,
+    "page_views": 7000,
+    "sessions": 5000,
+    "conversion_rate": null,
+    "ad_spend_jpy": 60000.0
+  },
+  {
+    "date": "2025-11-30",
+    "asin": "B0HTSTAND1",
+    "sku": "HT-PHN-STAND",
+    "title": "スマホスタンド 折りたたみ 卓上",
+    "units": 220,
+    "sales_jpy": 440000.0,
+    "page_views": 5000,
+    "sessions": 3600,
+    "conversion_rate": null,
+    "ad_spend_jpy": 45000.0
+  }
+]

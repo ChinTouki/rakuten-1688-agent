@@ -1,116 +1,98 @@
 import csv
 import json
+import argparse
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-
-# ==== 根据你项目的结构修改这里 ====
-BASE_DIR = Path(__file__).resolve().parents[1]  # 项目根目录
-OUT_DIR = BASE_DIR / "data" / "amazon_reports"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def parse_float(v: str) -> Optional[float]:
-    v = (v or "").strip().replace(",", "")
-    if not v:
-        return None
-    try:
-        return float(v)
-    except ValueError:
-        return None
-
-
-def parse_int(v: str) -> Optional[int]:
-    v = (v or "").strip().replace(",", "")
-    if not v:
-        return None
-    try:
-        return int(float(v))
-    except ValueError:
-        return None
-
-
-def normalize_row(row: Dict[str, str]) -> Dict[str, Any]:
+def convert_csv_to_json(csv_file: str, shop_id: str) -> None:
     """
-    把亚马逊 Business Report 的一行，统一映射成我们内部用的字段。
-    这里同时考虑英文列名 & 日文列名，你实际可以按自己 CSV 调整。
+    读取 Amazon 日报 CSV，转换为 data/amazon_reports/{shop_id}.json
+
+    要求 CSV 至少包含这些列：
+      - date
+      - asin
+      - sku
+      - title
+      - units
+      - sales_jpy
+      - page_views
+      - sessions
+      - ad_spend_jpy
     """
-    # 你可以先 print(row.keys()) 看看真实列名，然后在下面补充映射
-    col = {k.strip(): v for k, v in row.items()}
+    csv_path = Path(csv_file)
 
-    # 可能的列名候选（按你实际 CSV 调整）
-    def pick(*cands: str) -> str:
-        for c in cands:
-            if c in col:
-                return col[c]
-        return ""
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV 文件不存在: {csv_path}")
 
-    date = pick("date", "Date", "日付")
-    asin = pick("asin", "ASIN")
-    sku = pick("sku", "SKU", "商品番号")
-    title = pick("title", "タイトル", "商品名")
+    records = []
 
-    units = parse_int(pick("units_ordered", "Units Ordered", "注文商品数"))
-    sales_jpy = parse_float(pick("ordered_product_sales", "Ordered Product Sales", "注文商品売上"))
-    page_views = parse_int(pick("page_views", "Page Views", "ページビュー"))
-    sessions = parse_int(pick("sessions", "Sessions", "セッション"))
-    conversion_rate = parse_float(
-        pick("conversion_rate", "Unit Session Percentage", "ユニットセッション率 (%)").replace("%", "")
+    # ★关键：用 UTF-8-SIG 读取，避免 cp932 解码错误
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            # 必须有 date & asin，其他缺失就按 0 或 None
+            if not row.get("date") or not row.get("asin"):
+                continue
+
+            def _to_int(v, default=0):
+                try:
+                    v = (v or "").strip()
+                    return int(v) if v else default
+                except Exception:
+                    return default
+
+            def _to_float(v, default=0.0):
+                try:
+                    v = (v or "").strip()
+                    return float(v) if v else default
+                except Exception:
+                    return default
+
+            rec = {
+                "date": row.get("date"),
+                "asin": row.get("asin"),
+                "sku": row.get("sku") or None,
+                "title": row.get("title") or None,
+                "units": _to_int(row.get("units")),
+                "sales_jpy": _to_float(row.get("sales_jpy")),
+                "page_views": _to_int(row.get("page_views")),
+                "sessions": _to_int(row.get("sessions")),
+                # 转化率先交给后端去算，这里统一设为 None
+                "conversion_rate": None,
+                "ad_spend_jpy": _to_float(row.get("ad_spend_jpy")),
+            }
+            records.append(rec)
+
+    out_dir = Path("data/amazon_reports")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    out_path = out_dir / f"{shop_id}.json"
+    out_path.write_text(
+        json.dumps(records, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
-    ad_spend_jpy = parse_float(pick("ad_spend_jpy", "Ad Spend", "広告費"))  # 如果没有就为空
-
-    # 类别可以后面单独打，先留空
-    # category = pick("category", "カテゴリ")  # 可选
-
-    return {
-        "date": date,                        # "2025-11-01"
-        "asin": asin,
-        "sku": sku or None,
-        "title": title or None,
-        "units": units or 0,
-        "sales_jpy": sales_jpy or 0.0,
-        "page_views": page_views,
-        "sessions": sessions,
-        "conversion_rate": conversion_rate,
-        "ad_spend_jpy": ad_spend_jpy,
-        # "category": category or None,
-    }
+    print(f"saved: {out_path}  (records={len(records)})")
 
 
-def convert_csv_to_json(csv_path: Path, shop_id: str) -> Path:
-    """
-    把指定 CSV 转成 JSON，保存为 data/amazon_reports/{shop_id}.json
-    """
-    records: List[Dict[str, Any]] = []
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert Amazon daily CSV report to JSON for HT shop analysis."
+    )
+    parser.add_argument(
+        "csv_file",
+        help="输入的 Amazon 日报 CSV 文件路径（UTF-8 或 UTF-8-SIG）",
+    )
+    parser.add_argument(
+        "--shop-id",
+        required=True,
+        help="店铺 ID（生成 data/amazon_reports/{shop_id}.json）",
+    )
+    args = parser.parse_args()
 
-    # 亚马逊 JP 报表常见是 Shift_JIS / CP932，你可以试试：
-    #   - 如果报错，改成 encoding="utf-8-sig"
-    with csv_path.open("r", encoding="cp932", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rec = normalize_row(row)
-            # 只保留有 ASIN & 日期的行
-            if rec["asin"] and rec["date"]:
-                records.append(rec)
-
-    out_path = OUT_DIR / f"{shop_id}.json"
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
-
-    print(f"✅ {len(records)} records saved to {out_path}")
-    return out_path
+    convert_csv_to_json(args.csv_file, args.shop_id)
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Convert Amazon Business Report CSV to JSON")
-    parser.add_argument("csv_file", help="Path to Amazon CSV file")
-    parser.add_argument("--shop-id", required=True, help="Shop ID, e.g. ht_amazon_main")
-    args = parser.parse_args()
-
-    csv_path = Path(args.csv_file)
-    if not csv_path.exists():
-        raise SystemExit(f"CSV file not found: {csv_path}")
-
-    convert_csv_to_json(csv_path, args.shop_id)
+    main()

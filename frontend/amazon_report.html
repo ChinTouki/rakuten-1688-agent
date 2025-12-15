@@ -181,6 +181,23 @@
       return resp;
     }
 
+    async function loadAmazonSummary() {
+  const shopId = document.getElementById("shopIdInput").value || "ht_amazon_main";
+  const targetMonth = document.getElementById("monthInput").value || "";
+
+  const resp = await secureFetch("/amazon/analysis/summary", {
+    method: "POST",
+    body: JSON.stringify({
+      shop_id: shopId,
+      target_month: targetMonth || null,
+    }),
+  });
+
+  const data = await resp.json();
+  // 把 data.summary / data.top_asins / data.rakuten_candidates 渲染出来
+}
+
+
     // ====== 分析ロジック ======
     let lastAmazonAnalysis = null;
 

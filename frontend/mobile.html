@@ -10,18 +10,73 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-50 min-h-screen">
+  <!-- パスワード遮罩モーダル -->
+  <div
+    id="tokenModal"
+    class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden"
+  >
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl mx-6 p-4 w-full max-w-xs">
+      <h2 class="text-sm font-semibold mb-1">運営用ログイン</h2>
+      <p class="text-[11px] text-slate-400 mb-3">
+        楽天選品・運営エージェントを利用するには、事前に共有されたパスワードを入力してください。
+      </p>
+      <form id="tokenForm" class="space-y-3">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-300 mb-1">
+            パスワード
+          </label>
+          <input
+            id="tokenInput"
+            type="password"
+            class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm"
+            placeholder="******"
+            autocomplete="off"
+          />
+          <p
+            id="tokenError"
+            class="mt-1 text-[11px] text-red-400 hidden"
+          ></p>
+        </div>
+        <div class="flex gap-2">
+          <button
+            type="submit"
+            class="flex-1 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white"
+          >
+            ログイン
+          </button>
+          <button
+            type="button"
+            class="px-3 py-2 rounded-xl bg-slate-800 text-[11px] text-slate-200"
+            onclick="cancelTokenModal()"
+          >
+            キャンセル
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ヘッダー -->
   <header class="px-4 py-3 flex items-center justify-between bg-slate-950 border-b border-slate-800">
     <div>
       <div class="text-sm font-semibold">楽天選品・運営エージェント</div>
       <div class="text-[11px] text-slate-400">モバイル版ワークフロー</div>
     </div>
-    <a
-      href="/ui/"
-      class="text-[11px] px-2 py-1 rounded-lg border border-slate-700 text-slate-300"
-    >
-      PC版へ
-    </a>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="text-[11px] px-2 py-1 rounded-lg border border-slate-700 text-slate-300"
+        onclick="openTokenModal(true)"
+      >
+        パスワード再入力
+      </button>
+      <a
+        href="/ui/"
+        class="text-[11px] px-2 py-1 rounded-lg border border-slate-700 text-slate-300"
+      >
+        PC版へ
+      </a>
+    </div>
   </header>
 
   <!-- ステップナビ -->
@@ -362,16 +417,69 @@
     // ====== 共通：Token & secureFetch ======
     const TOKEN_STORAGE_KEY = "rakuten_agent_token_v1";
     let agentToken = localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+    let tokenWaiters = [];
+
+    function openTokenModal(fromButton = false) {
+      const modal = document.getElementById("tokenModal");
+      const input = document.getElementById("tokenInput");
+      const err = document.getElementById("tokenError");
+      if (!modal || !input || !err) return;
+
+      modal.classList.remove("hidden");
+      err.classList.add("hidden");
+      err.textContent = "";
+      if (!fromButton) {
+        // 初回アクセス時は空にしておく
+        input.value = "";
+      }
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function closeTokenModal() {
+      const modal = document.getElementById("tokenModal");
+      if (!modal) return;
+      modal.classList.add("hidden");
+    }
+
+    function cancelTokenModal() {
+      // キャンセル時: モーダルだけ閉じる。実際のAPI呼び出し時には ensureToken() が再度要求する。
+      closeTokenModal();
+      // まだ待っている Promise があれば、エラーで返す
+      tokenWaiters.forEach((w) => w.reject(new Error("パスワード入力がキャンセルされました。")));
+      tokenWaiters = [];
+    }
 
     async function ensureToken() {
-      if (!agentToken) {
-        const input = window.prompt("運営エージェント用パスワードを入力してください：");
-        if (!input) {
-          throw new Error("パスワードが入力されていません。");
-        }
-        agentToken = input.trim();
-        localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
+      if (agentToken) {
+        return;
       }
+      openTokenModal();
+      return new Promise((resolve, reject) => {
+        tokenWaiters.push({ resolve, reject });
+      });
+    }
+
+    const tokenForm = document.getElementById("tokenForm");
+    if (tokenForm) {
+      tokenForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = document.getElementById("tokenInput");
+        const err = document.getElementById("tokenError");
+        const val = (input.value || "").trim();
+        if (!val) {
+          err.textContent = "パスワードを入力してください。";
+          err.classList.remove("hidden");
+          return;
+        }
+        agentToken = val;
+        localStorage.setItem(TOKEN_STORAGE_KEY, agentToken);
+        err.classList.add("hidden");
+        err.textContent = "";
+        closeTokenModal();
+        // すべての待ち Promise を解決
+        tokenWaiters.forEach((w) => w.resolve());
+        tokenWaiters = [];
+      });
     }
 
     async function secureFetch(url, options = {}) {
@@ -386,9 +494,11 @@
       const resp = await fetch(url, { ...options, headers });
 
       if (resp.status === 401) {
+        // トークン無効：再入力を促す
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         agentToken = "";
-        alert("パスワードが間違っています。もう一度お試しください。");
+        alert("パスワードが間違っています。もう一度入力してください。");
+        openTokenModal(true);
         throw new Error("Unauthorized");
       }
 
@@ -836,18 +946,13 @@
       }
     };
 
-    // ===== 初期表示 & 初回パスワード確認 =====
+    // ===== 初期表示 =====
     showStep(1);
 
-    (async () => {
-      try {
-        await ensureToken();
-      } catch (err) {
-        console.warn("初回トークン確認エラー:", err);
-        // キャンセルされた場合などは、そのまま。実行時に secureFetch がもう一度聞く。
-      }
-    })();
-
+    // 初回アクセス時、localStorage に token が無ければモーダル表示
+    if (!agentToken) {
+      openTokenModal();
+    }
   </script>
 </body>
 </html>
